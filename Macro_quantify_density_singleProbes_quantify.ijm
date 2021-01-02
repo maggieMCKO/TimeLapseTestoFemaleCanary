@@ -67,9 +67,9 @@ for (j = 0; j < image_list.length; j++){
 
 	// analyze Particles
 	if (j == 0){
-		run("Analyze Particles...", "size=8-Infinity clear add");
+		run("Analyze Particles...", "size=8-Infinity clear display add");
 		}else{
-			run("Analyze Particles...", "size=8-Infinity  add");}
+			run("Analyze Particles...", "size=8-Infinity display add");}
 
 	// get no. of ROIs
 	n_roi = roiManager("count");
