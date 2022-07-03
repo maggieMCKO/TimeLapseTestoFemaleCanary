@@ -6,17 +6,20 @@
 		open images as sequences
 */
 
-input_Project = "F:\\Gahr\\EXPPIX\\RNAscope\\TestoProject\\";
-probe = "UTS2B";
+input_Project = "/Volumes/Seagate/Gahr/EXPPIX/RNAscope/TestoProject/";
+
+
+//probe = "ALDH1A2";
+probe = "SRD5A2";
 print(probe);
 
-input = input_Project+probe+"\\10x_cut\\";
-output = input_Project+probe+"\\10x_cut\\";
+input = input_Project+probe+"/10x_cut/CTu/"; 
+output = input_Project+probe+"/10x_cut/";
 //File.makeDirectory(output);    
 
 image_list = getFileList(input);
 
-//for (j = 0; j < 1; j++){
+//for (j = 0; j < 2; j++){
 for (j = 0; j < image_list.length; j++){
 	temp_image = input+image_list[j] ;
 	print(temp_image);
@@ -67,9 +70,9 @@ for (j = 0; j < image_list.length; j++){
 
 	// analyze Particles
 	if (j == 0){
-		run("Analyze Particles...", "size=8-Infinity clear display add");
+		run("Analyze Particles...", "size=8-Infinity clear add");
 		}else{
-			run("Analyze Particles...", "size=8-Infinity display add");}
+			run("Analyze Particles...", "size=8-Infinity  add");}
 
 	// get no. of ROIs
 	n_roi = roiManager("count");
