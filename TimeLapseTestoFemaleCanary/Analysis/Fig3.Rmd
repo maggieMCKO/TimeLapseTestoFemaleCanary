@@ -1,0 +1,141 @@
+---
+title: "Figure 1"
+output: html_notebook
+author: "Meng-Ching Ko (MaggieMCKO)"
+date: "06/23/2022"
+---
+
+This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.3 and related supplement tables of Ko et al. (https://www.biorxiv.org/content/10.1101/2022.06.13.495861v1).
+
+### Fig.3A
+```{r}
+library(tidyverse) # v.1.3.1
+library(RColorBrewer) # 1.1-3
+
+## load data
+path =  paste0(getwd(), "/Data/Expression.tsv")
+Expr = read_tsv(path)
+Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+
+
+## prep data
+Expr_TF = Expr %>% 
+  mutate(Direction = ifelse(LFC.ave>0, "up", 'down')) %>% 
+  group_by(Group, Direction, regulatory.function) %>% 
+  tally()
+Expr_TF$Direction = factor(Expr_TF$Direction, levels = c("up", "down"))
+
+Expr_TF_lab = Expr %>% 
+  mutate(Direction = ifelse(LFC.ave>0, "up", 'down')) %>% 
+  group_by(Group, Direction) %>% 
+  tally() %>% 
+  pivot_wider(id_cols = Group, names_from = Direction, values_from = n) %>% 
+  mutate(y_up = down + up/2,
+         y_down = down/2)
+  
+## pick colors
+cbPalette_ori = brewer.pal(n = 3, name = "PuOr")
+color_up = cbPalette_ori[3]
+color_dw = cbPalette_ori[1]
+plot(1:length(cbPalette_ori), rep(1, length(cbPalette_ori)), col = cbPalette_ori)
+cbPalette = c(alpha(color_dw, alpha = .5), color_dw, # dw, dw_TF
+              alpha(color_up, alpha = .5), color_up) # up, up_TF
+
+p = ggplot(Expr_TF, aes(x = Group, y = n)) + 
+  geom_bar(aes(fill = interaction(regulatory.function, Direction), color = Direction), stat="identity", 
+           position=position_stack(reverse = F), width=.75, size = .3) +
+  geom_text(data = Expr_TF_lab, 
+            aes(x = Group, y = y_up, label = up), 
+            color = "black", size = FontSize) +
+  geom_text(data = Expr_TF_lab, 
+            aes(x = Group, y = y_down, label = down), 
+            color = "black", size = FontSize) +
+  scale_fill_manual(values = cbPalette) + 
+  scale_color_manual(values=c(color_dw, color_up)) +
+  scale_y_continuous("Number of differentially expressed genes", 
+                     expand = c(0,0,0.05,0)) +
+  guides(fill = guide_legend(reverse = FALSE, nrow = 4, byrow = TRUE), colour = "none") + # reverse legend
+  theme_classic() + 
+  theme(strip.text.y = element_blank(), 
+        legend.position = 'right',
+        legend.title = element_blank()
+  ); p
+
+```
+
+
+
+
+### Fig.3B and Supplementary Table 4
+```{r}
+library(tidyverse) # v.1.3.1
+
+## load data
+path =  paste0(getwd(), "/Data/Expression.tsv")
+Expr = read_tsv(path)
+
+# make wide
+Expr_s = Expr %>% pivot_wider(id_cols = c(GeneSymbol, description), 
+                              names_from = Group, values_from = `LFC.ave`) 
+Expr_s$Category = apply(Expr_s[, 3:8], 1, function(s){
+  if(any(is.na(s))){"transiently regulated"}else if(all(s>0)){"constantly up-regulated"
+  }else if (all(s<0)){"constantly down-regulated"}else{"dynamically regulated"}
+})
+
+# Supplementary Table 4
+Expr_s_filtered = Expr_s %>% filter(Category %in% c("constantly up-regulated", "constantly down-regulated", "dynamically regulated")) 
+```
+
+#### plot
+```{r}
+# add count
+Expr_s = Expr_s %>%
+  group_by(Category) %>%
+  mutate(count = n(),
+         Category = paste0(Category, ": ", count))
+
+# pick colors
+cbPalette_ori = brewer.pal(n = 3, name = "PuOr")
+color_up = cbPalette_ori[1] 
+color_dw = cbPalette_ori[3]
+plot(1:length(cbPalette_ori), rep(1, length(cbPalette_ori)), col = cbPalette_ori)
+
+Expr_s$Color = apply(Expr_s[, 3:8], 1, function(s){
+  if(any(is.na(s))){"lightgrey"}else if(all(s>0)){color_up}else if (all(s<0)){color_dw}else{"seagreen4"}
+})
+table(Expr_s$Color)
+
+
+Expr_s_l = gather(Expr_s, Group, LFC, T1h:T14d) %>% filter(! is.na(LFC))
+
+order_category = sapply(c("constantly up-regulated", "constantly down-regulated", 
+                          "dynamically regulated", "transiently regulated"), 
+                        function(s){ unique(Expr_s$Category)[grep(s, unique(Expr_s$Category) )]})
+Expr_s_l = within(Expr_s_l, Category <- factor(Category, levels = unique(order_category)))
+Expr_s_l = within(Expr_s_l, Group <- factor(Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d")))
+
+range(Expr_s_l$LFC)
+levels(Expr_s_l$Category)
+
+
+Line_p2 = ggplot(Expr_s_l, aes(x = Group, y = LFC, group = GeneSymbol, color = Category)) +
+  geom_hline(yintercept = -0.5, size = 0.2, linetype = "dashed") +
+  geom_hline(yintercept = 0.5, size = 0.2, linetype = "dashed") +
+  geom_line(aes(alpha = Category)) +
+  scale_color_manual(values = c(color_up, color_dw, "seagreen4", "lightgrey")) +
+  scale_alpha_manual(values = c(0.2, 0.2, 0.2, 0.1)) +
+  scale_y_continuous(name = expression('log'['2']*' fold change') , limits = c(-3, 3.5), 
+                     breaks = c(-3, -2, -1, -0.5, 0.5, 1, 2, 3)) +
+  facet_wrap(.~Category, nrow = 2) +
+  # guides(alpha = 1) +
+  guides(alpha = guide_legend(override.aes = list(alpha = 1)),
+         color = guide_legend(nrow = 2, byrow = TRUE)
+  ) + # reverse legend
+  theme_m + #theme(legend.position = c(0.3, 0.9))
+  theme(legend.position = 'none',
+        panel.border = element_rect(color = 'grey50', fill = 'transparent'),
+        axis.text.y = element_text(hjust = 1)) ; Line_p2
+
+
+```
+
