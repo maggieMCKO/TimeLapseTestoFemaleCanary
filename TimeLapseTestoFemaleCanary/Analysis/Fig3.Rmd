@@ -138,4 +138,76 @@ Line_p2 = ggplot(Expr_s_l, aes(x = Group, y = LFC, group = GeneSymbol, color = C
 
 
 ```
+### Fig.3C
+```{r}
+library(tidyverse) # v.1.3.1
+
+## load data
+path = paste0(getwd(), "/Data/ClueGO_Top10.csv")
+ClueGO_short = read_csv(file = path)
+
+## prep data
+input = ClueGO_short %>% 
+  mutate(`GO term` = paste(GOID, GOTerm, sep = ": ")) %>% 
+  dplyr::select(`GO term`, fun.ind, fun, matches("Nr")) %>% 
+  pivot_longer(cols = matches("Nr"), names_to = "Group", values_to = "value") %>% 
+  mutate(Group = gsub("Nr..Genes_", "", Group)) %>% 
+  ## sort by time
+  arrange(Group, fun.ind, value )
+input$`GO term` = factor(input$`GO term`, levels = rev(unique(input$`GO term`)))
+input$Group = factor(input$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+
+## legend
+colpal = c(brewer.pal(9, name = 'Set1')[c(1:2, 8, 3,4,7,5, 9)], brewer.pal(9, name = 'Set3')[-2])
+# plot(1:length(colpal), col = colpal, pch = 19)
+colpal = colpal[1:length(unique(input$fun))]
+colpal_alpha = alpha(colpal, 0.5)
+
+if(length(colpal) == length(unique(input$fun))){
+  unique(input$fun)
+  lab = unique(input$fun)
+  lab = factor(lab, levels = lab);
+  lab; length(lab)
+  
+  n = ceiling(length(lab)/2)
+  plot(x = c(rep(0, n), rep(8, n)), y = c(n:1, n:1), col = alpha(colpal, 0.5), pch = 19, xlim = c(0, 15))
+  text(x = c(rep(.2, n), rep(8.2, n)), y = c(n:1, n:1), lab, cex= 1, pos=4, col="black")
+
+}
+
+```
+
+#### plot
+```{r}
+## colors for T groups
+cbPalette = rev(brewer.pal(length(measure.vars), 'Spectral')) 
+# plot(1:6, col = cbPalette, cex = 5, pch = 19)
+
+jColors <- with(input, data.frame(fun = lab, color = I(colpal)))
+RowSideColors_fun = jColors$color[match(input$fun, jColors$fun)]
+input2 = cbind(input, RowSideColors_fun)
+
+ymax = 3050
+paper = ggplot(input2, aes(y = value, x = `GO term`)) +
+  geom_bar(aes( fill = Group), stat = 'identity', 
+           position= position_stack(reverse = TRUE), 
+           width = .8, alpha = 0.9, color = 'grey', size = 0.05) + 
+  geom_point(aes(x = `GO term`, y = ymax), 
+             color = RowSideColors_fun, alpha = 0.1, size = 0.8) +
+  coord_flip() +
+  scale_fill_manual(values = cbPalette) +
+  scale_y_continuous(name = "Number of observed genes", expand = c(0,0, 0.05, 0)) +
+  guides(fill = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme_classic() + 
+  theme(panel.grid.major.x = element_line(color = "grey90", size = .2),
+                  axis.title.y = element_blank(),
+                  legend.key.size = unit(8, 'pt'), 
+                  legend.position = "bottom") ; paper
+```
+
+
+```{r}
+
+
+```
 
