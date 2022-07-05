@@ -1,13 +1,15 @@
 ---
-title: "Figure 1"
+title: "Figure 3 and related supplement tables"
 output: html_notebook
 author: "Meng-Ching Ko (MaggieMCKO)"
 date: "06/23/2022"
 ---
 
-This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.3 and related supplement tables of Ko et al. (https://www.biorxiv.org/content/10.1101/2022.06.13.495861v1).
+This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.3 and related supplement tables of Ko et al. (<https://www.biorxiv.org/content/10.1101/2022.06.13.495861v1>).
+Data deposited on dryad: https://doi.org/10.5061/dryad.5hqbzkh8c
 
 ### Fig.3A
+
 ```{r}
 library(tidyverse) # v.1.3.1
 library(RColorBrewer) # 1.1-3
@@ -63,16 +65,15 @@ p = ggplot(Expr_TF, aes(x = Group, y = n)) +
 
 ```
 
-
-
-
 ### Fig.3B and Supplementary Table 4
+
 ```{r}
 library(tidyverse) # v.1.3.1
 
 ## load data
 path =  paste0(getwd(), "/Data/Expression.tsv")
 Expr = read_tsv(path)
+Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
 
 # make wide
 Expr_s = Expr %>% pivot_wider(id_cols = c(GeneSymbol, description), 
@@ -82,11 +83,14 @@ Expr_s$Category = apply(Expr_s[, 3:8], 1, function(s){
   }else if (all(s<0)){"constantly down-regulated"}else{"dynamically regulated"}
 })
 
-# Supplementary Table 4
+```
+#### Supplementary Table 4
+```{r}
 Expr_s_filtered = Expr_s %>% filter(Category %in% c("constantly up-regulated", "constantly down-regulated", "dynamically regulated")) 
 ```
 
-#### plot
+#### plot Fig.3B
+
 ```{r}
 # add count
 Expr_s = Expr_s %>%
@@ -138,7 +142,9 @@ Line_p2 = ggplot(Expr_s_l, aes(x = Group, y = LFC, group = GeneSymbol, color = C
 
 
 ```
+
 ### Fig.3C
+
 ```{r}
 library(tidyverse) # v.1.3.1
 
@@ -178,6 +184,7 @@ if(length(colpal) == length(unique(input$fun))){
 ```
 
 #### plot
+
 ```{r}
 ## colors for T groups
 cbPalette = rev(brewer.pal(length(measure.vars), 'Spectral')) 
@@ -205,9 +212,190 @@ paper = ggplot(input2, aes(y = value, x = `GO term`)) +
                   legend.position = "bottom") ; paper
 ```
 
-
+### Fig.3D and Supplementary Table 8
 ```{r}
+library(tidyverse) # v.1.3.1
 
+path =  paste0(getwd(), "/Data/Expression.tsv")
+Expr = read_tsv(path)
+Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+
+path = paste0(getwd(), "/Data/CellType_GeneList.tsv")
+cell_type_gene_lists_df = read_tsv(path)
+
+cell_typeS = c( 
+  # vessel
+  "Endothelial cell", "Fibroblast", "Pericyte", "Smooth muscle cell",
+  # Glia
+  "Glial", "Astrocyte", "Microglia", "Oligodendrocyte", 
+  # neuron
+  "Neuron", "Neuronal", "Interneuron", "Projection neuron", 
+  # neuronal process
+  "Axon", "Axon hillock", "Myelin", "Dendrite", "Spine" , "Gap junction", 
+  # neurotransmitters
+  "Adrenergic receptor", "Epinephrine", "Norepinephrine", 
+  "Dopamine receptor", "Dopamine", "GABA receptor", "GABA", 
+  "Glutamate receptor", "Glutamate", "Glycine receptor", "Glycine", 
+  "Histamine receptor", "Histamine", "Serotonin receptor", "Serotonin",
+  # Genesis
+  "Neural stem cell", "Radial glial cell")
+
+groups = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d")
+
+# color for Time points
+cbPalette = rev(brewer.pal(length(groups), 'Spectral'))
+# plot(1:length(cbPalette), col = cbPalette, pch = 19, cex = 3)
+
+## expectation standardize to expectation value [function] 
+Plot_gene_expectationRatio = function(temp_cell_type, interest_dir, padj, return_plot){
+  # temp_cell_type = cell_typeS[1]
+  # interest_dir = 'up'
+  # padj = 'fdr'
+  
+  print(temp_cell_type)
+  interest_dir_in_fun = interest_dir
+  print(interest_dir_in_fun)
+  if(interest_dir_in_fun == "up"){ dir_title = "up-regulated"}else 
+    if(interest_dir_in_fun == "dw"){ dir_title = "down-regulated"}else{ dir_title = "" }
+  
+  temp_cell_type_list = cell_type_gene_lists_df %>% filter(CellType == temp_cell_type)
+  
+  temp_intersectS = 
+    sapply(X = 1:length(groups), interest_dir2 = interest_dir_in_fun, 
+           FUN = function(j, interest_dir2){
+             print(paste0("j = ", j))
+             
+             temp_up = Expr %>% filter(Group == groups[j], LFC.ave > 0) %>% pull(GeneSymbol)
+             temp_dw = Expr %>% filter(Group == groups[j], LFC.ave < 0) %>% pull(GeneSymbol )
+             
+             if(interest_dir2 == "up"){ temp_updw = temp_up}else 
+               if(interest_dir2 == "dw"){ temp_updw = temp_dw}else{
+                 temp_updw = c(temp_up, temp_dw) }
+             # print(paste0("length:", length(temp_updw)))
+             
+             temp = intersect(temp_updw, temp_cell_type_list$GeneSymbol) ;
+             count = length(temp);
+             len_timepoint = length(unique(temp_updw)) ;
+             len_cell_list = length(unique(temp_cell_type_list$GeneSymbol)) ;
+             len_universe = 15609 # (protein-coding)
+             # canary genome: https://www.ncbi.nlm.nih.gov/genome/annotation_euk/Serinus_canaria/101/#FeatureCountsStats;
+             expect = len_timepoint*len_cell_list/len_universe ;
+             
+             mat <- matrix(
+               c(count,                       # gene in list & in the interested category
+                 len_timepoint - count,       # gene in list but in the interested category
+                 len_cell_list,               # gene in universe & in the interested category
+                 len_universe - len_cell_list # gene in universe but not in the interested category
+               ),  
+               nrow = 2);
+             fr <- fisher.test(mat, alternative = "greater")
+             # print(expect)
+             return(c(count, expect, signif(fr$p.value, 10) )) 
+             })
+  
+  temp_intersectS = as.data.frame(t(temp_intersectS));
+  names(temp_intersectS) = c("Gene count", "Expectation", "P-value");
+  temp_intersectS$`Time point` = groups;
+  temp_intersectS$`Search term` = temp_cell_type;
+  temp_intersectS$Substraction = temp_intersectS$`Gene count`- temp_intersectS$Expectation;
+  temp_intersectS$Ratio = temp_intersectS$Substraction/temp_intersectS$Expectation*100
+  temp_intersectS$FDR = p.adjust(temp_intersectS$`P-value`, method = padj) # bonferroni, fdr
+  temp_intersectS$Significance = ifelse(temp_intersectS$FDR < 0.05, '*', NA) # bonferroni, fdr
+  temp_intersectS = within(temp_intersectS, `Time point` <- factor(`Time point`, levels = groups))
+  temp_intersectS = cbind(temp_intersectS, "Direction" = interest_dir_in_fun)
+  
+  if(return_plot == TRUE){
+    ggplot(temp_intersectS, aes(x = `Time point`, y = Ratio, fill = `Time point`)) +
+      geom_col() +
+      geom_hline(yintercept = 0, color = "darkgrey", size = 0.25) +
+      geom_text(data = subset(temp_intersectS, su = FDR < 0.05), label = "*") +
+      scale_fill_manual(values = cbPalette) +
+      scale_y_continuous(name = "Enrichment\nscore") +
+      ggtitle(paste(temp_cell_type, dir_title, sep = "\n")) +
+      theme_m + 
+      theme(plot.title = element_text(hjust = 0.5),
+            axis.text.x = element_blank(),
+            axis.ticks.x = element_blank()
+            ) ;
+  }else{temp_intersectS}
+}
 
 ```
 
+#### Supplementary Table 8
+```{r}
+interest_dir_in = c("up", "dw")
+multiple_correction_method = "fdr"
+
+plot_out = mapply(rep(cell_typeS, each = length(interest_dir_in)), 
+                  interest_dir = rep(interest_dir_in, length(cell_typeS)),
+                  padj = multiple_correction_method, 
+                  return_plot = FALSE,
+                  FUN = Plot_gene_expectationRatio, SIMPLIFY = FALSE)
+plot_out_r = plot_out %>% bind_rows()
+
+# reorganize table
+plot_out_r2 = plot_out_r %>% 
+  select(`Search term`, Direction, `Time point`, `Gene count`, Expectation, `P-value`, FDR, Significance) %>%
+  mutate(Direction = gsub("up", "up-regulated", Direction),
+         Direction = gsub("dw", "down-regulated", Direction))
+```
+
+#### plot Fig.3D
+```{r}
+
+### up and down separate ##
+rbind_df = plot_out_r2 %>% filter( Direction %in% c("up-regulated", "down-regulated")) %>% 
+  mutate(`adjusted p value` = ifelse(FDR > 0.05, NA, FDR))
+
+#### Cell type panel
+rbind_df_1 = rbind_df %>% 
+  filter(`Search term` %in% c("Endothelial cell", "Smooth muscle cell",
+                              "Astrocyte", "Microglia", "Oligodendrocyte",
+                              "Interneuron", "Projection neuron"))
+#### Neuron location + neurotransmitter panel
+rbind_df_2 = rbind_df %>% 
+  filter(`Search term` %in% c("Axon", "Myelin", "Dendrite", "Spine" , "Gap junction", 
+                              "GABA", "Glutamate"))
+#### combine both
+rbind_df = rbind(cbind("Source" = "Cell type", rbind_df_1),
+                 cbind("Source" = "Neuronal", rbind_df_2))
+
+rbind_df$`Time point` = factor(rbind_df$`Time point`, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+rbind_df$Direction = factor(rbind_df$Direction, levels = c("up-regulated", "down-regulated"))
+rbind_df$`Search term` = factor(rbind_df$`Search term`, levels = rev(cell_typeS))
+
+sig_col = 'darkorange'
+
+NeuronLoc_p = ggplot(rbind_df, aes(x = `Time point`, y = `Search term`, fill = `adjusted p value`)) +
+  geom_tile(color = "grey90", size = 0.01) +
+  scale_fill_continuous(high = "white", low = sig_col, na.value = alpha("grey90", 0.5)) + 
+  scale_y_discrete(expand = c(0,0)) +
+  scale_x_discrete(expand = c(0,0)) + 
+  facet_grid( Source ~ Direction, scales = "free_y", space = "free_y") +
+  theme_classic() + 
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank()); NeuronLoc_p
+
+```
+
+### Supplementary Table 9
+```{r}
+library(tidyverse) # v.1.3.1
+
+path =  paste0(getwd(), "/Data/Expression.tsv")
+Expr = read_tsv(path)
+Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+
+path = paste0(getwd(), "/Data/CellType_GeneList.tsv")
+cell_type_gene_lists_df = read_tsv(path)
+
+Expr_sel = Expr %>% dplyr::select(GeneSymbol, Group, LFC.ave, regulatory.function, matrix.family, Chromosome)
+
+cell_type_gene_express = cell_type_gene_lists_df %>% 
+  left_join(Expr_sel) %>% 
+  filter(!is.na(LFC.ave)) %>% 
+  pivot_wider(names_from = Group, values_from = LFC.ave) %>% 
+  dplyr::select(CellType:Chromosome, T1h, T3h, T8h, T3d, T7d, T14d)
+
+```

@@ -1,11 +1,12 @@
 ---
-title: "Figure 1"
+title: "Figure 2 and related supplement tables"
 output: html_notebook
 author: "Meng-Ching Ko (MaggieMCKO)"
 date: "06/23/2022"
 ---
 
 This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.2 and related supplement tables of Ko et al. (https://www.biorxiv.org/content/10.1101/2022.06.13.495861v1).
+Data deposited on dryad: https://doi.org/10.5061/dryad.5hqbzkh8c
 
 ### Fig. 2D
 ```{r}
