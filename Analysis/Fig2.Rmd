@@ -40,12 +40,12 @@ stats2 = lapply(probes, function(Probe_x){
   y_lab = "Normalized stained area (%)"
   
   # 1. deciding using sqrt or not and evaluating model
-  mod_a <- lmer(data = db, log(percent_area_slide) ~ Group + (1|Slide) ) # log
+  mod_a <- lmer(data = db, sqrt(percent_area_slide) ~ Group + (1|Slide) ) # sqrt
   
   plot(mod_a)  
   summary(mod_a)
   
-  dev.off()
+  plot.new()
   par(mfrow=c(3,2))
   qqnorm(resid(mod_a))
   qqline(resid(mod_a))
@@ -87,9 +87,9 @@ stats2 = lapply(probes, function(Probe_x){
   new_data_mod_a$lower <- apply(fitmat, 1, quantile, prob=0.025)
   new_data_mod_a$upper <- apply(fitmat, 1, quantile, prob=0.975)
   new_data_mod_a$fit <- apply(fitmat, 1, mean)
-  new_data_mod_a$fit_exp <- exp(new_data_mod_a$fit)        # transform back from log
-  new_data_mod_a$upper_exp <- exp(new_data_mod_a$upper)    # transform back from log
-  new_data_mod_a$lower_exp <- exp(new_data_mod_a$lower)    # transform back from log
+  new_data_mod_a$fit_sim<- (new_data_mod_a$fit)^2         # transform back from sqrt
+  new_data_mod_a$upper_sim <- (new_data_mod_a$upper)^2   # transform back from sqrt
+  new_data_mod_a$lower_sim <- (new_data_mod_a$lower)^2    # transform back from sqrt
   
   w = 0.25
   grey_point_size = 0.5
@@ -104,23 +104,23 @@ stats2 = lapply(probes, function(Probe_x){
   plot_mod_a3 = ggplot(new_data_mod_a) +
     # need this layer to set up
     geom_point(data = new_data_mod_a,
-               aes(x = Group, y = fit_exp), color='black', size=mean_point_size) +
+               aes(x = Group, y = fit_sim), color='black', size=mean_point_size) +
     # raw data
-    geom_point(data = db, 
+    geom_point(data = db,
                aes(x = as.numeric(Group)+w, y = percent_area_slide),
                position = dodge, alpha = 0.5, size = grey_point_size,
                color = "grey50") +
     # CI
     geom_errorbar(data = new_data_mod_a,
-                  aes(x = Group, ymax = upper_exp, ymin = lower_exp),
+                  aes(x = Group, ymax = upper_sim, ymin = lower_sim),
                   width = errorbar_hori, size = errorbar_wd,
                   color = errorbar_col) +
     # estimate
     geom_point(data = new_data_mod_a,
-               aes(x = Group, y = fit_exp), color='black', size=mean_point_size) +
+               aes(x = Group, y = fit_sim), color='black', size=mean_point_size) +
     ylab(y_lab) +
     ggtitle(Probe_x) +
-    theme_classic() + 
+    theme_classic() +
     theme(plot.title = element_text(hjust = 0.5)); plot_mod_a3
   
   pp = function(StimulatedTable){
@@ -184,9 +184,9 @@ plots2 =  lapply(1:length(stats2), function(i){
 
 ```{r}
 x = arrangeGrob(grobs = plots2, nrow = 1)
+plot.new()
 grid.draw(x)
 ```
-
 
 
 ### Fig. 2E
