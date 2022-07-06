@@ -1,6 +1,6 @@
 This repository contains scripts for reproducing the graphs and statistic results of the manuscript 'Extensive, transient, and long-lasting gene regulation in a song-controlling brain area during testosterone-induced song development in adult female canaries'  https://www.biorxiv.org/content/10.1101/2022.06.13.495861v1
 
-Data deposited on dryad: https://doi.org/10.5061/dryad.5hqbzkh8c
+Data were deposited on dryad: https://doi.org/10.5061/dryad.5hqbzkh8c
 
 | Scripts   |            Figure/Table            |   data  |
 | --------- | ---------------------------------  | ------- |
