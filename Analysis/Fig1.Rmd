@@ -1,8 +1,11 @@
 ---
 title: "Figure 1 and related supplement tables and figures"
-output: html_notebook
 author: "Meng-Ching Ko (MaggieMCKO)"
-date: "06/23/2022"
+date: "05/06/2023"
+output: 
+  github_document:
+    toc: true
+    toc_depth: 2
 ---
 
 This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.1 and related supplement tables and figures of Ko et al. (https://www.biorxiv.org/content/10.1101/2022.06.13.495861v1).
@@ -10,7 +13,7 @@ Data deposited on dryad: https://doi.org/10.5061/dryad.5hqbzkh8c
 
 ### Fig. 1B, Supplementary Table 2 and 3
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 library(lme4) # 1.1-29
 library(arm) # 1.7-19
 set.seed(100)
@@ -231,7 +234,7 @@ df_t2 = df_t %>% as_tibble() %>%
 ## Fig. 1C-F
 ### Supplementary Table 1
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 library(ggbreak) # 0.1.0
 library(patchwork) # 1.1.1
 set.seed(100)
@@ -769,7 +772,7 @@ RepetitionRate_n_Day_df_t = rbind(cbind("Var" = "SongLen", "Parameter" = levels(
 
 ### Fig. 1G
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 library(PMCMRplus)
 
 path = paste0(getwd(), "/Data/HVC_volume.tsv")
@@ -809,7 +812,7 @@ kwAllPairsDunnTest(`HVC Volume (mm3)` ~ Group, data = HVC, p.adjust.method = "ho
 
 ### Fig. 1 - Figure supplement 2A
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 set.seed(100)
 
 path = paste0(getwd(), "/Data/DayLv_data.tsv")
@@ -850,7 +853,7 @@ Daily_SongRate_p = ggplot(data = db, aes(x = as.numeric(n_Day), y = Daily_SongRa
 
 ### Fig. 1 - Figure supplement 2B
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 set.seed(100)
 
 path = paste0(getwd(), "/Data/SongLv_data.tsv")
@@ -886,7 +889,7 @@ SongLen_p = ggplot(db) +
 
 ### Fig. 1 - Figure supplement 2C
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 set.seed(100)
 
 path = paste0(getwd(), "/Data/SongLv_data.tsv")
@@ -922,7 +925,7 @@ RepetitionRate_p = ggplot(db, aes(x = as.numeric(n_Day), y = RepetitionRate,
 
 ### Fig. 1 - Figure supplement 2D
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 set.seed(100)
 
 path = paste0(getwd(), "/Data/SongLv_data.tsv")
@@ -957,7 +960,7 @@ SylperSong_p = ggplot(db, aes(x = as.numeric(n_Day), y = SylperSong,
 
 ### Fig. 1 - Figure supplement 3A, Supplementary Table 2 and 3
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 set.seed(100)
 
 path = paste0(getwd(), "/Data/DayLv_data.tsv")
@@ -1066,7 +1069,7 @@ Daily_SongRate_Grp_df_t = rbind(cbind("Var" = "Daily_SongRate", "Parameter" = le
 
 ### Fig. 1 - Figure supplement 3B, Supplementary Table 2 and 3
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 set.seed(100)
 
 path = paste0(getwd(), "/Data/SongLv_data.tsv")
@@ -1176,7 +1179,7 @@ SongLen_Grp_df_t = rbind(cbind("Var" = "SongLen", "Parameter" = levels(db$Group)
 
 ### Fig. 1 - Figure supplement 3C, Supplementary Table 2 and 3
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 set.seed(100)
 
 path = paste0(getwd(), "/Data/SongLv_data.tsv")
@@ -1287,7 +1290,7 @@ RepetitionRate_Grp_df_t = rbind(cbind("Var" = "RepetitionRate", "Parameter" = le
 
 ### Fig. 1 - Figure supplement 3D, Supplementary Table 2 and 3
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 set.seed(100)
 
 path = paste0(getwd(), "/Data/SongLv_data.tsv")
@@ -1400,7 +1403,7 @@ SylperSong_Grp_df_t = rbind(cbind("Var" = "SylperSong", "Parameter" = levels(db$
 
 ### Fig. 1 - Figure supplement 4A
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 library(PMCMRplus) # 1.9.4
 path =  paste0(getwd(), "/Data/Physiological_measurements.tsv")
 Weights = read_tsv(path)
@@ -1421,7 +1424,7 @@ kruskal.test(`Body Weight (g)` ~ Group, data = Weights)
 
 ### Fig. 1 - Figure supplement 4B
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 library(PMCMRplus) # 1.9.4
 path =  paste0(getwd(), "/Data/Physiological_measurements.tsv")
 Weights = read_tsv(path)
@@ -1453,7 +1456,7 @@ kwAllPairsDunnTest(`Brain (mg)` ~ Group, data = Weights, p.adjust.method="holm")
 
 ### Fig. 1 - Figure supplement 4C
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 library(PMCMRplus) # 1.9.4
 path =  paste0(getwd(), "/Data/Physiological_measurements.tsv")
 Weights = read_tsv(path)
@@ -1474,7 +1477,7 @@ kruskal.test(`Oviduct (mg)` ~ Group , data = Weights)
 
 ### Fig. 1 - Figure supplement 4D
 ```{r}
-library(tidyverse) # v.1.3.1
+library(tidyverse) # v.2.0.0
 library(PMCMRplus) # 1.9.4
 path = paste0(getwd(), "/Data/HVC_volume.tsv")
 HVC = read_tsv(path)

@@ -1,16 +1,155 @@
 ---
 title: "Figure 2 and related supplement tables"
-output: html_notebook
 author: "Meng-Ching Ko (MaggieMCKO)"
-date: "06/23/2022"
+date: "05/06/2023"
+output: 
+  github_document:
+    toc: true
+    toc_depth: 2
 ---
 
 This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.2 and related supplement tables of Ko et al. (https://www.biorxiv.org/content/10.1101/2022.06.13.495861v1).
 Data deposited on dryad: https://doi.org/10.5061/dryad.5hqbzkh8c
 
-### Fig. 2D
+### Fig.2A
 ```{r}
-library(tidyverse) # v.1.3.0
+library(tidyverse) # v.2.0.0
+library(RColorBrewer) # 1.1-3
+
+## load data
+path =  paste0(getwd(), "/Data/DiffExpression.tsv")
+Expr = read_tsv(path)
+Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+
+
+## prep data
+Expr_TF = Expr %>% 
+  mutate(Direction = ifelse(LFC.ave>0, "up", 'down')) %>% 
+  group_by(Group, Direction, regulatory.function) %>% 
+  tally()
+Expr_TF$Direction = factor(Expr_TF$Direction, levels = c("up", "down"))
+
+Expr_TF_lab = Expr %>% 
+  mutate(Direction = ifelse(LFC.ave>0, "up", 'down')) %>% 
+  group_by(Group, Direction) %>% 
+  tally() %>% 
+  pivot_wider(id_cols = Group, names_from = Direction, values_from = n) %>% 
+  mutate(y_up = down + up/2,
+         y_down = down/2)
+  
+## pick colors
+cbPalette_ori = brewer.pal(n = 3, name = "PuOr")
+color_up = cbPalette_ori[3]
+color_dw = cbPalette_ori[1]
+plot(1:length(cbPalette_ori), rep(1, length(cbPalette_ori)), col = cbPalette_ori)
+cbPalette = c(alpha(color_dw, alpha = .5), color_dw, # dw, dw_TF
+              alpha(color_up, alpha = .5), color_up) # up, up_TF
+
+FontSize = 2
+p = ggplot(Expr_TF, aes(x = Group, y = n)) + 
+  geom_bar(aes(fill = interaction(regulatory.function, Direction), color = Direction), stat="identity", 
+           position=position_stack(reverse = F), width=.75, size = .3) +
+  geom_text(data = Expr_TF_lab, 
+            aes(x = Group, y = y_up, label = up), 
+            color = "black", size = FontSize) +
+  geom_text(data = Expr_TF_lab, 
+            aes(x = Group, y = y_down, label = down), 
+            color = "black", size = FontSize) +
+  scale_fill_manual(values = cbPalette) + 
+  scale_color_manual(values=c(color_dw, color_up)) +
+  scale_y_continuous("Number of differentially expressed genes", 
+                     expand = c(0,0,0.05,0)) +
+  guides(fill = guide_legend(reverse = FALSE, nrow = 4, byrow = TRUE), colour = "none") + # reverse legend
+  theme_classic() + 
+  theme(strip.text.y = element_blank(), 
+        legend.position = 'right',
+        legend.title = element_blank()
+  ); p
+
+```
+
+### Fig.2B and Supplementary Table 4
+
+```{r}
+library(tidyverse) # v.2.0.0
+
+## load data
+path =  paste0(getwd(), "/Data/DiffExpression.tsv")
+Expr = read_tsv(path)
+Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+
+# make wide
+Expr_s = Expr %>% pivot_wider(id_cols = c(GeneSymbol, description), 
+                              names_from = Group, values_from = `LFC.ave`) 
+Expr_s$Category = apply(Expr_s[, 3:8], 1, function(s){
+  if(any(is.na(s))){"transiently regulated"}else if(all(s>0)){"constantly up-regulated"
+  }else if (all(s<0)){"constantly down-regulated"}else{"dynamically regulated"}
+})
+
+```
+
+#### plot Fig.2B
+
+```{r}
+# add count
+Expr_s = Expr_s %>%
+  group_by(Category) %>%
+  mutate(count = n(),
+         Category = paste0(Category, ": ", count))
+
+# pick colors
+cbPalette_ori = brewer.pal(n = 3, name = "PuOr")
+color_up = cbPalette_ori[1] 
+color_dw = cbPalette_ori[3]
+plot(1:length(cbPalette_ori), rep(1, length(cbPalette_ori)), col = cbPalette_ori)
+
+Expr_s$Color = apply(Expr_s[, 3:8], 1, function(s){
+  if(any(is.na(s))){"lightgrey"}else if(all(s>0)){color_up}else if (all(s<0)){color_dw}else{"seagreen4"}
+})
+table(Expr_s$Color)
+
+
+Expr_s_l = gather(Expr_s, Group, LFC, T1h:T14d) %>% filter(! is.na(LFC))
+
+order_category = sapply(c("constantly up-regulated", "constantly down-regulated", 
+                          "dynamically regulated", "transiently regulated"), 
+                        function(s){ unique(Expr_s$Category)[grep(s, unique(Expr_s$Category) )]})
+Expr_s_l = within(Expr_s_l, Category <- factor(Category, levels = unique(order_category)))
+Expr_s_l = within(Expr_s_l, Group <- factor(Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d")))
+
+range(Expr_s_l$LFC)
+levels(Expr_s_l$Category)
+
+
+Line_p2 = ggplot(Expr_s_l, aes(x = Group, y = LFC, group = GeneSymbol, color = Category)) +
+  geom_hline(yintercept = -0.5, size = 0.2, linetype = "dashed") +
+  geom_hline(yintercept = 0.5, size = 0.2, linetype = "dashed") +
+  geom_line(aes(alpha = Category)) +
+  scale_color_manual(values = c(color_up, color_dw, "seagreen4", "lightgrey")) +
+  scale_alpha_manual(values = c(0.2, 0.2, 0.2, 0.1)) +
+  scale_y_continuous(name = expression('log'['2']*' fold change') , limits = c(-3, 3.5), 
+                     breaks = c(-3, -2, -1, -0.5, 0.5, 1, 2, 3)) +
+  facet_wrap(.~Category, nrow = 2) +
+  # guides(alpha = 1) +
+  guides(alpha = guide_legend(override.aes = list(alpha = 1)),
+         color = guide_legend(nrow = 2, byrow = TRUE)
+  ) + # reverse legend
+  theme_classic() +
+  theme(legend.position = 'none',
+        panel.border = element_rect(color = 'grey50', fill = 'transparent'),
+        axis.text.y = element_text(hjust = 1)) ; Line_p2
+
+
+```
+#### Supplementary Table 4
+```{r}
+Expr_s_filtered = Expr_s %>% filter(Category %in% c("constantly up-regulated", "constantly down-regulated", "dynamically regulated")) 
+```
+
+
+### Fig. 2F and Supplementary Table 2 and 3
+```{r}
+library(tidyverse) # v.2.0.0
 library(lme4) # 1.1-29
 library(arm) # 1.7-19
 library(gridExtra) # 2.3
@@ -147,8 +286,8 @@ stats2 = lapply(probes, function(Probe_x){
   return(list(plot_mod_a3, pp(new_data_mod_a), df_t2, CI2))
 })
 ```
-### Supplementary Table 2 and 3
-#### CredibleInterval
+#### Supplementary Table 2 and 3
+##### CredibleInterval
 ```{r}
 pp_CI2 = lapply(1:length(stats2), function(i){
   # i=1
@@ -156,7 +295,7 @@ pp_CI2 = lapply(1:length(stats2), function(i){
 }) %>% bind_rows(); pp_CI2
 ```
 
-#### estimates
+##### estimates
 ```{r}
 pp_est2 = lapply(1:length(stats2), function(i){
   # i=1
@@ -164,7 +303,7 @@ pp_est2 = lapply(1:length(stats2), function(i){
 }) %>% bind_rows(); pp_est2
 ```
 
-#### PostProbability
+##### PostProbability
 ```{r}
 pp_summary2 = lapply(1:length(stats2), function(i){
   # i=1
@@ -172,7 +311,7 @@ pp_summary2 = lapply(1:length(stats2), function(i){
 }) %>% bind_rows(); pp_summary2
 ```
 
-#### Graph
+#### Fig. 2F
 ```{r}
 plots2 =  lapply(1:length(stats2), function(i){
   # i=1
@@ -180,135 +319,87 @@ plots2 =  lapply(1:length(stats2), function(i){
   p
 }) 
 
-```
-
-```{r}
 x = arrangeGrob(grobs = plots2, nrow = 1)
 plot.new()
 grid.draw(x)
 ```
 
 
-### Fig. 2E
-#### load data
-```{r}
-library(tidyverse) # v.1.3.1
-library(gplots) # 3.1.3
-library(RColorBrewer) # 1.1-3
 
-set.seed(100)
+### Fig. 2 - Figure supplement 1
+```{r}
+library(tidyverse) # v.2.0.0
 
 ## load data
-path =  paste0(getwd(), "/Data/Expression.tsv")
+path =  paste0(getwd(), "/Data/DiffExpression.tsv")
 Expr = read_tsv(path)
+Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
 
 # make wide
 Expr_s = Expr %>% pivot_wider(id_cols = c(GeneSymbol, description), 
                               names_from = Group, values_from = `LFC.ave`) 
-```
-
-#### prep matrix
-```{r}
-# target genes
-targets = c("AR", "SRD5A2", "CYP19A1", "ESR1", "ESR2", "BDNF", "KDR", "FLT1", "FLT4", 
-             "VEGFC", "VEGFA", "MMP2", "MMP9", "NTRK2", "NTRK1", "NGFR", 
-             "UTS2B", "SULT1A1", "SULT1E1", "AKR1C2", "GPER1", "GPRC6A", 
-             "SP8", "ABP", "SHBG", "HSD3B2", "CYP17A1", "HSD17B12", "SRD5A2", "SRD5A1", "SRD5A3", 
-             "CYP19A1", "AKR1C4", "AKR1D1", "COMT",
-             "HSD17B1", "HSD17B11", "HSD17B2", "HSD17B4", 
-             "UGT1A1", "UGT1A8", "UGT1A9", "UGT2B17", 
-             "ALDH1A2", "STAR", "TSPO", "VDAC1") 
-
-# target genes expr
-Expr_s_targets = Expr_s %>% filter(GeneSymbol %in% targets)
-
-# prep matrix
-input_matrix = Expr_s_targets[, 3:8] %>% as.matrix()
-row.names(input_matrix) = paste0(Expr_s_targets$GeneSymbol, ": ", Expr_s_targets$description)
-input_matrix[is.na(input_matrix)] = 0
-```
-
-#### prep annotations
-```{r}
-# color for expression
-col_pl = rev(brewer.pal(11,"PuOr"))
-
-#  color for annotation
-hc = hclust(dist(input_matrix))
-plot(hc)
-str(hc)
-hc_lab = hc$labels
-hc_lab_sym = gsub("(.*): .*.$", "\\1", hc_lab); hc_lab_sym
-
-## add annotation
-sex_steriod_receptors = c("GPRC6A", "AR", "ESR1", "ESR2")
-steroidogenesis = c("AKR1D1", "COMT", "CYP17A1",  "CYP19A1", 
-                    "HSD17B1", "HSD17B11", "HSD17B12","HSD17B2",  "HSD17B4", "HSD3B2", 
-                    "SRD5A1", "SRD5A2", "SRD5A3", "STAR", "SULT1E1", "TSPO", 
-                    "UGT1A1", "UGT1A8", "UGT1A9", "UGT2B17", "VDAC1", "ALDH1A2")   
-angio = c("FLT1", "FLT4", "KDR", "MMP2", "MMP9", "VEGFA", "VEGFC", "UTS2B")
-neuro_recruit = c("BDNF", "NTRK2")
-
-input_anno = sapply(hc_lab_sym , function(s){
-  if(s%in% steroidogenesis){"Steroidogenesis"}else if(s %in% sex_steriod_receptors){
-    "Sex steriod receptors"}else if (s%in%neuro_recruit){
-      "Testosterone-induced neuronal recruitment"}else if(s %in% angio){
-        "Testosterone-induced angiogenesis"}else{"SP8"}
+Expr_s$`Number of regulated time points` =  apply(Expr_s[, 3:8], 1, function(s){
+  sum(!is.na(s))
 })
-length(input_anno) == nrow(input_matrix)
 
-# display.brewer.pal(9, name = 'Set1')
-colpal_anno = brewer.pal(9, name = 'Set1')[c(9, 2, 3, 1,6, 8, 7,4,5)]
-colpal_anno = alpha(colpal_anno, alpha = 0.75)
-colpal_anno = colpal_anno[1:length(unique(input_anno))]
-plot(1:length(colpal_anno),  col = colpal_anno, cex = 3, pch = 19)
-length(colpal_anno)
-length(unique(input_anno))
+x = Expr_s %>% group_by(`Number of regulated time points`) %>% 
+  tally(name = "Number of genes") %>% 
+  mutate(class = ifelse(`Number of regulated time points` == 6, 'constantly regulated', 'transiently regulated'))
+x$class <- factor(x$class, levels = c('transiently regulated', 'constantly regulated'))
 
-funtobe = c("Steroidogenesis", "Sex steriod receptors", "Testosterone-induced neuronal recruitment",
-            "Testosterone-induced angiogenesis", "SP8")
-jColors <- data.frame(fun = funtobe, color = I(colpal_anno))
-plot(1:length(jColors$color),  col = jColors$color, cex = 3, pch = 19)
-RowSideColors_fun = jColors$color[match(input_anno, jColors$fun)]
-
+p = ggplot(x, aes(x = `Number of regulated time points`, y = `Number of genes`)) +
+  geom_col(aes(fill = class)) +
+  geom_text(aes(label = `Number of genes`), vjust = -1, size = FontSize) +
+  scale_y_continuous(expand = c(0,0,0.05,0)) + 
+  scale_x_continuous(breaks = 1:6) + 
+  scale_fill_manual(values = c('grey70', 'grey30')) +
+  theme_classic() +
+  theme(legend.position = c(0.7, 0.85)); p
 ```
 
-#### heatmap
+### Fig. 2 - Figure supplement 2A
 ```{r}
-par( lwd = 0.5)
-heatmap.2(x = input_matrix, Rowv = T, Colv = F, dendrogram =  "row",
-          col = col_pl,
-          
-          RowSideColors = RowSideColors_fun,
-          na.rm = TRUE,
-          na.color = "grey90",
-          trace = "none",
-          density.info = "none",
-          key.title = "LFC",
-          key.xlab = NA,
-          key.ylab = "1",
-          srtCol = 0,
-          cexRow = 0.7,
-          cexCol = 0.7,
-          adjCol = 0.5,
-          lmat = rbind(c(3, 1, 2, 0), c(5, 5, 5 ,4)), 
-          lhei = c(.85, .15), 
-          lwid = c(0.1, 0.03, 0.2, 0.8),
-          margins =c(2, 2)
-)
+tb = tibble("Matrix" = c("v$ARE.01",
+                         "V$ARE.02",
+                         "V$ARE.03",
+                         "V$ARE.04",
+                         "V$ER.01",
+                         "V$ER.02",
+                         "V$ER.03",
+                         "V$ER.04",
+                         "V$ESR2.01"),
+            "T1h" = c(NA, NA, NA, 3.88, NA, 2.05, 5.19, 2.43, 3.45),
+            "T3h" = rep(NA, 9),
+            "T8h" = c(NA, NA, -3.13, NA, NA, -2.03, -3.19, -2.3, NA),
+            "T3d" = c(2.5, NA, NA, -3, rep(NA, 5)),
+            "T7d" = c(rep(NA, 6), 2.17, 3.41, NA), 
+            "T14d" = c(-3.5, NA, NA, 3.5, NA, 2.68, 4.41, NA, NA))
+tb_l = tb %>% pivot_longer(cols = matches("^T"), names_to = "TimePoint", values_to = "z score") %>% 
+  mutate(class = ifelse(grepl("ARE", Matrix), "ARE", "ERE"))
+tb_l$TimePoint <- factor(tb_l$TimePoint, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+tb_l$Matrix <- factor(tb_l$Matrix, levels = rev(c("v$ARE.01",
+                                              "V$ARE.02",
+                                              "V$ARE.03",
+                                              "V$ARE.04",
+                                              "V$ER.01",
+                                              "V$ER.02",
+                                              "V$ER.03",
+                                              "V$ER.04",
+                                              "V$ESR2.01")))
+tb_l$class <- factor(tb_l$class, levels = c("ARE", "ERE"))
 
-```
-#### legend
-```{r}
-plot.new()
-legend(x = 0.1, y = 0.9,      
-       title = "Category",
-       legend = jColors$fun, # category labels
-       col = jColors$color,  # color key
-       cex = 1, lty = 1,  # line style
-       lwd = 5,          # line width,
-       box.lwd = .1, 
-       ncol = 1
-) 
+col = brewer.pal(n = 9, 'Set1')
+er = col[1]
+ar = col[2]
+
+p = tb_l %>% 
+  ggplot(aes(y = Matrix, x = `z score`)) +
+  geom_col(aes(fill = class), alpha = 0.9) +
+  geom_vline(xintercept = 0, size = 0.1) +
+  scale_fill_manual(values = c(ar, er)) +
+  facet_grid(TimePoint~. ) + theme_classic() +
+  theme(panel.border = element_rect(color = "black", size = .1, fill = 'transparent'),
+    legend.position = 'right',
+    legend.key.size = unit(8, 'pt')); p
 ```
 
