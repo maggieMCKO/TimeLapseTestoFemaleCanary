@@ -573,6 +573,7 @@ cat(col_def, sep = "\n")
 ```{r}
 library(tidyverse) # v.2.0.0
 library(HiveR) # 0.3.63
+library(grid) # 4.3.0
 
 # load string output
 path = paste0(getwd(), "/Data/WGCNA/SP8_string_nodes_20180531.tsv") 
@@ -671,7 +672,7 @@ df$radius = 0
 df$offset = 0
 df$hjust = 0.5
 df$vjust = 0.5
-# write_csv(df, file = anNodes_path)
+write_csv(df, file = anNodes_path)
 
 plotHive(H1, axLabs = sel_col, ch = 5, bkgnd = "transparent",
          axLab.pos = 20, 
