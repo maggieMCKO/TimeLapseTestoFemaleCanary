@@ -1,0 +1,14 @@
+chr - turquoise	turquoise	0	6485	1
+chr - green	green	0	943	2
+chr - blue	blue	0	891	3
+chr - black	black	0	780	4
+chr - brown	brown	0	603	5
+chr - yellow	yellow	0	580	6
+chr - red	red	0	483	7
+chr - magenta	magenta	0	417	8
+chr - greenyellow	greenyellow	0	372	9
+chr - salmon	salmon	0	239	10
+chr - cyan	cyan	0	190	11
+chr - midnightblue	midnightblue	0	184	12
+chr - grey60	grey60	0	122	13
+chr - grey	grey	0	71	14
