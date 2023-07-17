@@ -51,8 +51,9 @@ Expr = read_tsv(path)
     ## Rows: 19501 Columns: 11
     ## ── Column specification ────────────────────────────────────────────────────────
     ## Delimiter: "\t"
-    ## chr (7): GeneSymbol, Group, regulatory.function, matrix.family, Chromosome, ...
+    ## chr (6): GeneSymbol, Group, regulatory.function, Chromosome, description, po...
     ## dbl (4): Coverage, LFC.ave, pval, padj
+    ## lgl (1): matrix.family
     ## 
     ## ℹ Use `spec()` to retrieve the full column specification for this data.
     ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
@@ -323,7 +324,7 @@ paper = ggplot(input2, aes(y = value, x = `GO term`)) +
 
 ![](Fig3_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
 
-### Fig.3C and Supplementary Table 8
+### Fig.3C and Supplementary Table 9
 
 ``` r
 library(tidyverse) # v.2.0.0
@@ -335,8 +336,9 @@ Expr = read_tsv(path)
     ## Rows: 19501 Columns: 11
     ## ── Column specification ────────────────────────────────────────────────────────
     ## Delimiter: "\t"
-    ## chr (7): GeneSymbol, Group, regulatory.function, matrix.family, Chromosome, ...
+    ## chr (6): GeneSymbol, Group, regulatory.function, Chromosome, description, po...
     ## dbl (4): Coverage, LFC.ave, pval, padj
+    ## lgl (1): matrix.family
     ## 
     ## ℹ Use `spec()` to retrieve the full column specification for this data.
     ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
@@ -455,7 +457,7 @@ Plot_gene_expectationRatio = function(temp_cell_type, interest_dir, padj, return
 }
 ```
 
-#### Supplementary Table 8
+#### Supplementary Table 9
 
 ``` r
 interest_dir_in = c("up", "dw")
@@ -1078,7 +1080,7 @@ NeuronLoc_p = ggplot(rbind_df, aes(x = `Time point`, y = `Search term`, fill = `
 
 ![](Fig3_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
-### Supplementary Table 9
+### Supplementary Table 10
 
 ``` r
 library(tidyverse) # v.2.0.0
@@ -1090,8 +1092,9 @@ Expr = read_tsv(path)
     ## Rows: 19501 Columns: 11
     ## ── Column specification ────────────────────────────────────────────────────────
     ## Delimiter: "\t"
-    ## chr (7): GeneSymbol, Group, regulatory.function, matrix.family, Chromosome, ...
+    ## chr (6): GeneSymbol, Group, regulatory.function, Chromosome, description, po...
     ## dbl (4): Coverage, LFC.ave, pval, padj
+    ## lgl (1): matrix.family
     ## 
     ## ℹ Use `spec()` to retrieve the full column specification for this data.
     ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
@@ -1129,7 +1132,70 @@ cell_type_gene_express = cell_type_gene_lists_df %>%
     ## ℹ If a many-to-many relationship is expected, set `relationship =
     ##   "many-to-many"` to silence this warning.
 
-### Fig. 3 - Figure supplement 1A
+### Fig. 3 - Figure supplement 1
+
+``` r
+library(tidyverse) # v.2.0.0
+
+path = paste0(getwd(), "/Data/WGCNA/Expression_est_perBird.tsv")
+datExprori = read_tsv(path)
+```
+
+    ## New names:
+    ## Rows: 40 Columns: 12361
+    ## ── Column specification
+    ## ──────────────────────────────────────────────────────── Delimiter: "\t" chr
+    ## (1): sample dbl (12360): A1CF, A2M, A2ML1, A4GALT, A4GNT, AACS, AADACL4,
+    ## AADACP1, AADAT,...
+    ## ℹ Use `spec()` to retrieve the full column specification for this data. ℹ
+    ## Specify the column types or set `show_col_types = FALSE` to quiet this message.
+    ## • `PGM2` -> `PGM2...7817`
+    ## • `PGM2` -> `PGM2...7818`
+
+``` r
+interested_genes = c("AR", "HSD17B12", "SRD5A2", "ESR1", "ESR2", "SP8")
+ind = sapply(interested_genes, function(s){which(names(datExprori) == s)})
+ind = unlist(ind)
+
+datExpr_sel = datExprori %>% dplyr::select(sample, all_of(ind)) %>% 
+  separate(sample, into = c("daylength", "group", "tissue", "bird"), sep = '_', remove= F) %>% 
+  mutate(group = gsub("CTu1h", "CON", group),
+         group = gsub("T8hr", "T8h", group)) %>% 
+  pivot_longer(cols = all_of(interested_genes), names_to = 'Gene', values_to = 'Normalized expression') %>% 
+  mutate(group = fct_relevel(group, c("CON", "T1h", "T3h", "T8h", "T3d", "T7d", "T14d")),
+         Gene = fct_relevel(Gene, interested_genes)) %>% 
+  group_by(group, Gene) %>% 
+  mutate(mean = mean(`Normalized expression`, na.rm = TRUE),
+         n = n(),
+         sd = sd(`Normalized expression`, na.rm = TRUE),
+         sem = sd/sqrt(n))
+
+w = 0.25
+grey_point_size = 0.5
+mean_point_size = 1
+errorbar_wd = 1
+errorbar_hori = 0
+dodge = position_jitter(width = 0.05, height = 0)
+
+errorbar_col = "darkorange"
+
+p = datExpr_sel %>% 
+  ggplot(aes(x = group, y = `Normalized expression`)) +
+  geom_point(alpha = 0.7, size = grey_point_size,
+             color = "grey50", position = position_nudge(x = w)) +
+  geom_errorbar(aes(ymax = mean+sd, ymin = mean-sd),
+                width = errorbar_hori, size = errorbar_wd,
+                color = errorbar_col) +
+  geom_point(aes(x = group, y = mean), color='black', size=mean_point_size) +
+  scale_y_continuous(limits = c(NA, 12)) +
+  facet_wrap(.~Gene, nrow = 2) +
+  theme_classic() +
+  theme(panel.border = element_rect(linewidth = 0.2, fill = 'transparent', color = 'black')); p
+```
+
+![](Fig3_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+
+### Fig. 3 - Figure supplement 2A
 
 ``` r
 library(tidyverse) # v.2.0.0
@@ -1184,4 +1250,4 @@ paper = ggplot(input, aes(y = value, x = `GO term`)) +
 
     ## Warning: Removed 260 rows containing missing values (`position_stack()`).
 
-![](Fig3_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](Fig3_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
