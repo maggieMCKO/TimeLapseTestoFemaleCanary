@@ -1,14 +1,16 @@
 ---
 title: "Figure 2 and related supplement tables"
 author: "Meng-Ching Ko (MaggieMCKO)"
-date: "05/06/2023"
-output: 
-  github_document:
-    toc: true
-    toc_depth: 2
+date: "07/17/2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+editor_options: 
+  chunk_output_type: console
 ---
 
-This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.2 and related supplement tables of Ko et al. (https://www.biorxiv.org/content/10.1101/2022.06.13.495861v1).
+This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.2 and related supplement tables of Ko et al. (https://www.biorxiv.org/content/10.1101/2022.06.13.495861v3).
 Data deposited on dryad: https://doi.org/10.5061/dryad.5hqbzkh8c
 
 ### Fig.2A
@@ -18,22 +20,22 @@ library(RColorBrewer) # 1.1-3
 
 ## load data
 path =  paste0(getwd(), "/Data/DiffExpression.tsv")
-Expr = read_tsv(path)
-Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
-
+Expr = read_tsv(path) %>% 
+  filter(power >= 0.8)
+Expr$contrast = factor(Expr$contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
 
 ## prep data
 Expr_TF = Expr %>% 
-  mutate(Direction = ifelse(LFC.ave>0, "up", 'down')) %>% 
-  group_by(Group, Direction, regulatory.function) %>% 
+  mutate(direction = ifelse(logFC_ave>0, "up", 'down')) %>% 
+  group_by(contrast, direction, TF) %>% 
   tally()
-Expr_TF$Direction = factor(Expr_TF$Direction, levels = c("up", "down"))
+Expr_TF$direction = factor(Expr_TF$direction, levels = c("up", "down"))
 
 Expr_TF_lab = Expr %>% 
-  mutate(Direction = ifelse(LFC.ave>0, "up", 'down')) %>% 
-  group_by(Group, Direction) %>% 
+  mutate(direction = ifelse(logFC_ave>0, "up", 'down')) %>% 
+  group_by(contrast, direction) %>% 
   tally() %>% 
-  pivot_wider(id_cols = Group, names_from = Direction, values_from = n) %>% 
+  pivot_wider(id_cols = contrast, names_from = direction, values_from = n) %>% 
   mutate(y_up = down + up/2,
          y_down = down/2)
   
@@ -46,14 +48,14 @@ cbPalette = c(alpha(color_dw, alpha = .5), color_dw, # dw, dw_TF
               alpha(color_up, alpha = .5), color_up) # up, up_TF
 
 FontSize = 2
-p = ggplot(Expr_TF, aes(x = Group, y = n)) + 
-  geom_bar(aes(fill = interaction(regulatory.function, Direction), color = Direction), stat="identity", 
+p = ggplot(Expr_TF, aes(x = contrast, y = n)) + 
+  geom_bar(aes(fill = interaction(TF, direction), color = direction), stat="identity", 
            position=position_stack(reverse = F), width=.75, size = .3) +
   geom_text(data = Expr_TF_lab, 
-            aes(x = Group, y = y_up, label = up), 
+            aes(x = contrast, y = y_up, label = up), 
             color = "black", size = FontSize) +
   geom_text(data = Expr_TF_lab, 
-            aes(x = Group, y = y_down, label = down), 
+            aes(x = contrast, y = y_down, label = down), 
             color = "black", size = FontSize) +
   scale_fill_manual(values = cbPalette) + 
   scale_color_manual(values=c(color_dw, color_up)) +
@@ -75,13 +77,14 @@ library(tidyverse) # v.2.0.0
 
 ## load data
 path =  paste0(getwd(), "/Data/DiffExpression.tsv")
-Expr = read_tsv(path)
-Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+Expr = read_tsv(path) %>% 
+  filter(power >= 0.8)
+Expr$contrast = factor(Expr$contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
 
 # make wide
-Expr_s = Expr %>% pivot_wider(id_cols = c(GeneSymbol, description), 
-                              names_from = Group, values_from = `LFC.ave`) 
-Expr_s$Category = apply(Expr_s[, 3:8], 1, function(s){
+Expr_s = Expr %>% pivot_wider(id_cols = c(GeneSymbol), 
+                              names_from = contrast, values_from = `logFC_ave`) 
+Expr_s$Category = apply(Expr_s[, 2:7], 1, function(s){
   if(any(is.na(s))){"transiently regulated"}else if(all(s>0)){"constantly up-regulated"
   }else if (all(s<0)){"constantly down-regulated"}else{"dynamically regulated"}
 })
@@ -103,25 +106,25 @@ color_up = cbPalette_ori[1]
 color_dw = cbPalette_ori[3]
 plot(1:length(cbPalette_ori), rep(1, length(cbPalette_ori)), col = cbPalette_ori)
 
-Expr_s$Color = apply(Expr_s[, 3:8], 1, function(s){
+Expr_s$Color = apply(Expr_s[, 2:7], 1, function(s){
   if(any(is.na(s))){"lightgrey"}else if(all(s>0)){color_up}else if (all(s<0)){color_dw}else{"seagreen4"}
 })
 table(Expr_s$Color)
 
 
-Expr_s_l = gather(Expr_s, Group, LFC, T1h:T14d) %>% filter(! is.na(LFC))
+Expr_s_l = gather(Expr_s, contrast, LFC, T1h:T14d) %>% filter(! is.na(LFC))
 
 order_category = sapply(c("constantly up-regulated", "constantly down-regulated", 
                           "dynamically regulated", "transiently regulated"), 
                         function(s){ unique(Expr_s$Category)[grep(s, unique(Expr_s$Category) )]})
 Expr_s_l = within(Expr_s_l, Category <- factor(Category, levels = unique(order_category)))
-Expr_s_l = within(Expr_s_l, Group <- factor(Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d")))
+Expr_s_l = within(Expr_s_l, contrast <- factor(contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d")))
 
 range(Expr_s_l$LFC)
 levels(Expr_s_l$Category)
 
 
-Line_p2 = ggplot(Expr_s_l, aes(x = Group, y = LFC, group = GeneSymbol, color = Category)) +
+Line_p2 = ggplot(Expr_s_l, aes(x = contrast, y = LFC, group = GeneSymbol, color = Category)) +
   geom_hline(yintercept = -0.5, size = 0.2, linetype = "dashed") +
   geom_hline(yintercept = 0.5, size = 0.2, linetype = "dashed") +
   geom_line(aes(alpha = Category)) +
@@ -139,15 +142,16 @@ Line_p2 = ggplot(Expr_s_l, aes(x = Group, y = LFC, group = GeneSymbol, color = C
         panel.border = element_rect(color = 'grey50', fill = 'transparent'),
         axis.text.y = element_text(hjust = 1)) ; Line_p2
 
-
 ```
+
+
 #### Supplementary Table 5
 ```{r}
 Expr_s_filtered = Expr_s %>% filter(Category %in% c("constantly up-regulated", "constantly down-regulated", "dynamically regulated")) 
 ```
 
 
-### Fig. 2F and Supplementary Table 2 and 3
+### Fig. 2D, 2E and Supplementary Table 2 and 3
 ```{r}
 library(tidyverse) # v.2.0.0
 library(lme4) # 1.1-29
@@ -326,28 +330,152 @@ grid.draw(x)
 
 
 
-### Fig. 2 - Figure supplement 1
+### Fig. 2 - Figure supplement 1A
 ```{r}
 library(tidyverse) # v.2.0.0
 
 ## load data
 path =  paste0(getwd(), "/Data/DiffExpression.tsv")
-Expr = read_tsv(path)
-Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+Expr = read_tsv(path) 
+Expr$contrast = factor(Expr$contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+
+## prep data
+Expr_TF = Expr %>% 
+  mutate(direction = ifelse(logFC_ave>0, "up", 'down')) %>% 
+  group_by(contrast, direction, TF) %>% 
+  tally()
+Expr_TF$direction = factor(Expr_TF$direction, levels = c("up", "down"))
+
+Expr_TF_lab = Expr %>% 
+  mutate(direction = ifelse(logFC_ave>0, "up", 'down')) %>% 
+  group_by(contrast, direction) %>% 
+  tally() %>% 
+  pivot_wider(id_cols = contrast, names_from = direction, values_from = n) %>% 
+  mutate(y_up = down + up/2,
+         y_down = down/2)
+  
+## pick colors
+cbPalette_ori = brewer.pal(n = 3, name = "PuOr")
+color_up = cbPalette_ori[3]
+color_dw = cbPalette_ori[1]
+plot(1:length(cbPalette_ori), rep(1, length(cbPalette_ori)), col = cbPalette_ori)
+cbPalette = c(alpha(color_dw, alpha = .5), color_dw, # dw, dw_TF
+              alpha(color_up, alpha = .5), color_up) # up, up_TF
+
+FontSize = 2
+p = ggplot(Expr_TF, aes(x = contrast, y = n)) + 
+  geom_bar(aes(fill = interaction(TF, direction), color = direction), stat="identity", 
+           position=position_stack(reverse = F), width=.75, size = .3) +
+  geom_text(data = Expr_TF_lab, 
+            aes(x = contrast, y = y_up, label = up), 
+            color = "black", size = FontSize) +
+  geom_text(data = Expr_TF_lab, 
+            aes(x = contrast, y = y_down, label = down), 
+            color = "black", size = FontSize) +
+  scale_fill_manual(values = cbPalette) + 
+  scale_color_manual(values=c(color_dw, color_up)) +
+  scale_y_continuous("Number of differentially expressed genes", 
+                     expand = c(0,0,0.05,0)) +
+  guides(fill = guide_legend(reverse = FALSE, nrow = 4, byrow = TRUE), colour = "none") + # reverse legend
+  theme_classic() + 
+  theme(strip.text.y = element_blank(), 
+        legend.position = 'right',
+        legend.title = element_blank()
+  ); p
+
+```
+
+
+### Fig. 2 - Figure supplement 1B
+
+```{r}
+library(tidyverse) # v.2.0.0
+
+## load data
+path =  paste0(getwd(), "/Data/DiffExpression.tsv")
+Expr = read_tsv(path) 
+Expr$contrast = factor(Expr$contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
 
 # make wide
-Expr_s = Expr %>% pivot_wider(id_cols = c(GeneSymbol, description), 
-                              names_from = Group, values_from = `LFC.ave`) 
-Expr_s$`Number of regulated time points` =  apply(Expr_s[, 3:8], 1, function(s){
+Expr_s = Expr %>% pivot_wider(id_cols = c(GeneSymbol), 
+                              names_from = contrast, values_from = `logFC_ave`) 
+Expr_s$Category = apply(Expr_s[, 2:7], 1, function(s){
+  if(any(is.na(s))){"transiently regulated"}else if(all(s>0)){"constantly up-regulated"
+  }else if (all(s<0)){"constantly down-regulated"}else{"dynamically regulated"}
+})
+
+# add count
+Expr_s = Expr_s %>%
+  group_by(Category) %>%
+  mutate(count = n(),
+         Category = paste0(Category, ": ", count))
+
+# pick colors
+cbPalette_ori = brewer.pal(n = 3, name = "PuOr")
+color_up = cbPalette_ori[1] 
+color_dw = cbPalette_ori[3]
+plot(1:length(cbPalette_ori), rep(1, length(cbPalette_ori)), col = cbPalette_ori)
+
+Expr_s$Color = apply(Expr_s[, 2:7], 1, function(s){
+  if(any(is.na(s))){"lightgrey"}else if(all(s>0)){color_up}else if (all(s<0)){color_dw}else{"seagreen4"}
+})
+table(Expr_s$Color)
+
+
+Expr_s_l = gather(Expr_s, contrast, LFC, T1h:T14d) %>% filter(! is.na(LFC))
+
+order_category = sapply(c("constantly up-regulated", "constantly down-regulated", 
+                          "dynamically regulated", "transiently regulated"), 
+                        function(s){ unique(Expr_s$Category)[grep(s, unique(Expr_s$Category) )]})
+Expr_s_l = within(Expr_s_l, Category <- factor(Category, levels = unique(order_category)))
+Expr_s_l = within(Expr_s_l, contrast <- factor(contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d")))
+
+range(Expr_s_l$LFC)
+levels(Expr_s_l$Category)
+
+
+Line_p2 = ggplot(Expr_s_l, aes(x = contrast, y = LFC, group = GeneSymbol, color = Category)) +
+  geom_hline(yintercept = -0.5, size = 0.2, linetype = "dashed") +
+  geom_hline(yintercept = 0.5, size = 0.2, linetype = "dashed") +
+  geom_line(aes(alpha = Category)) +
+  scale_color_manual(values = c(color_up, color_dw, "seagreen4", "lightgrey")) +
+  scale_alpha_manual(values = c(0.2, 0.2, 0.2, 0.1)) +
+  scale_y_continuous(name = expression('log'['2']*' fold change') , limits = c(-3, 3.5), 
+                     breaks = c(-3, -2, -1, -0.5, 0.5, 1, 2, 3)) +
+  facet_wrap(.~Category, nrow = 2) +
+  # guides(alpha = 1) +
+  guides(alpha = guide_legend(override.aes = list(alpha = 1)),
+         color = guide_legend(nrow = 2, byrow = TRUE)
+  ) + # reverse legend
+  theme_classic() +
+  theme(legend.position = 'none',
+        panel.border = element_rect(color = 'grey50', fill = 'transparent'),
+        axis.text.y = element_text(hjust = 1)) ; Line_p2
+
+```
+
+### Fig. 2 - Figure supplement 1C
+```{r}
+library(tidyverse) # v.2.0.0
+
+## load data
+path =  paste0(getwd(), "/Data/DiffExpression.tsv")
+Expr = read_tsv(path) 
+Expr$contrast = factor(Expr$contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+
+Expr2 = Expr %>% dplyr::select(GeneSymbol, logFC_ave, contrast) %>% distinct() %>% 
+  pivot_wider(id_cols = c(GeneSymbol), 
+              names_from = contrast, values_from = logFC_ave) 
+Expr2$`Number of regulated time points` =  apply(Expr2[, 2:7], 1, function(s){
   sum(!is.na(s))
 })
 
-x = Expr_s %>% group_by(`Number of regulated time points`) %>% 
+Expr2_sum = Expr2 %>% group_by(`Number of regulated time points`) %>% 
   tally(name = "Number of genes") %>% 
   mutate(class = ifelse(`Number of regulated time points` == 6, 'constantly regulated', 'transiently regulated'))
-x$class <- factor(x$class, levels = c('transiently regulated', 'constantly regulated'))
+Expr2_sum$class <- factor(Expr2_sum$class, levels = c('transiently regulated', 'constantly regulated'))
 
-p = ggplot(x, aes(x = `Number of regulated time points`, y = `Number of genes`)) +
+p = ggplot(Expr2_sum, aes(x = `Number of regulated time points`, y = `Number of genes`)) +
   geom_col(aes(fill = class)) +
   geom_text(aes(label = `Number of genes`), vjust = -1, size = FontSize) +
   scale_y_continuous(expand = c(0,0,0.05,0)) + 
@@ -355,51 +483,38 @@ p = ggplot(x, aes(x = `Number of regulated time points`, y = `Number of genes`))
   scale_fill_manual(values = c('grey70', 'grey30')) +
   theme_classic() +
   theme(legend.position = c(0.7, 0.85)); p
+
 ```
 
-### Fig. 2 - Figure supplement 2A
+### Fig. 2 - Figure supplement 1D
 ```{r}
-tb = tibble("Matrix" = c("v$ARE.01",
-                         "V$ARE.02",
-                         "V$ARE.03",
-                         "V$ARE.04",
-                         "V$ER.01",
-                         "V$ER.02",
-                         "V$ER.03",
-                         "V$ER.04",
-                         "V$ESR2.01"),
-            "T1h" = c(NA, NA, NA, 3.88, NA, 2.05, 5.19, 2.43, 3.45),
-            "T3h" = rep(NA, 9),
-            "T8h" = c(NA, NA, -3.13, NA, NA, -2.03, -3.19, -2.3, NA),
-            "T3d" = c(2.5, NA, NA, -3, rep(NA, 5)),
-            "T7d" = c(rep(NA, 6), 2.17, 3.41, NA), 
-            "T14d" = c(-3.5, NA, NA, 3.5, NA, 2.68, 4.41, NA, NA))
-tb_l = tb %>% pivot_longer(cols = matches("^T"), names_to = "TimePoint", values_to = "z score") %>% 
-  mutate(class = ifelse(grepl("ARE", Matrix), "ARE", "ERE"))
-tb_l$TimePoint <- factor(tb_l$TimePoint, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
-tb_l$Matrix <- factor(tb_l$Matrix, levels = rev(c("v$ARE.01",
-                                              "V$ARE.02",
-                                              "V$ARE.03",
-                                              "V$ARE.04",
-                                              "V$ER.01",
-                                              "V$ER.02",
-                                              "V$ER.03",
-                                              "V$ER.04",
-                                              "V$ESR2.01")))
-tb_l$class <- factor(tb_l$class, levels = c("ARE", "ERE"))
+library(tidyverse) # v.2.0.0
 
-col = brewer.pal(n = 9, 'Set1')
-er = col[1]
-ar = col[2]
+## load data
+path =  paste0(getwd(), "/Data/DiffExpression.tsv")
+Expr = read_tsv(path) %>% 
+  filter(power >= 0.8)
+Expr$contrast = factor(Expr$contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
 
-p = tb_l %>% 
-  ggplot(aes(y = Matrix, x = `z score`)) +
-  geom_col(aes(fill = class), alpha = 0.9) +
-  geom_vline(xintercept = 0, size = 0.1) +
-  scale_fill_manual(values = c(ar, er)) +
-  facet_grid(TimePoint~. ) + theme_classic() +
-  theme(panel.border = element_rect(color = "black", size = .1, fill = 'transparent'),
-    legend.position = 'right',
-    legend.key.size = unit(8, 'pt')); p
+Expr2 = Expr %>% dplyr::select(GeneSymbol, logFC_ave, contrast) %>% distinct() %>% 
+  pivot_wider(id_cols = c(GeneSymbol), 
+              names_from = contrast, values_from = logFC_ave) 
+Expr2$`Number of regulated time points` =  apply(Expr2[, 2:7], 1, function(s){
+  sum(!is.na(s))
+})
+
+Expr2_sum = Expr2 %>% group_by(`Number of regulated time points`) %>% 
+  tally(name = "Number of genes") %>% 
+  mutate(class = ifelse(`Number of regulated time points` == 6, 'constantly regulated', 'transiently regulated'))
+Expr2_sum$class <- factor(Expr2_sum$class, levels = c('transiently regulated', 'constantly regulated'))
+
+p = ggplot(Expr2_sum, aes(x = `Number of regulated time points`, y = `Number of genes`)) +
+  geom_col(aes(fill = class)) +
+  geom_text(aes(label = `Number of genes`), vjust = -1, size = FontSize) +
+  scale_y_continuous(expand = c(0,0,0.05,0)) + 
+  scale_x_continuous(breaks = 1:6) + 
+  scale_fill_manual(values = c('grey70', 'grey30')) +
+  theme_classic() +
+  theme(legend.position = c(0.7, 0.85)); p
+
 ```
-
