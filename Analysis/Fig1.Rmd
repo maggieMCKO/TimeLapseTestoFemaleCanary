@@ -1,14 +1,16 @@
 ---
 title: "Figure 1 and related supplement tables and figures"
 author: "Meng-Ching Ko (MaggieMCKO)"
-date: "05/06/2023"
-output: 
-  github_document:
-    toc: true
-    toc_depth: 2
+date: "07/17/2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+editor_options: 
+  chunk_output_type: console
 ---
 
-This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.1 and related supplement tables and figures of Ko et al. (https://www.biorxiv.org/content/10.1101/2022.06.13.495861v1).
+This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.1 and related supplement tables and figures of Ko et al. (https://www.biorxiv.org/content/10.1101/2022.06.13.495861v3).
 Data deposited on dryad: https://doi.org/10.5061/dryad.5hqbzkh8c
 
 ### Fig. 1B, Supplementary Table 2 and 3
