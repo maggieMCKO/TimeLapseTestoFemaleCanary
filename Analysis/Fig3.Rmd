@@ -1,14 +1,16 @@
 ---
 title: "Figure 3 and related supplement tables"
 author: "Meng-Ching Ko (MaggieMCKO)"
-date: "05/06/2023"
-output: 
-  github_document:
-    toc: true
-    toc_depth: 2
+date: "07/17/2024"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+editor_options: 
+  chunk_output_type: console
 ---
 
-This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.3 and related supplement tables of Ko et al. (<https://www.biorxiv.org/content/10.1101/2022.06.13.495861v1>).
+This [R Markdown](http://rmarkdown.rstudio.com) Notebook contain codes for reproducing Fig.3 and related supplement tables of Ko et al. (https://www.biorxiv.org/content/10.1101/2022.06.13.495861v3).
 Data deposited on dryad: https://doi.org/10.5061/dryad.5hqbzkh8c
 
 
@@ -23,11 +25,13 @@ set.seed(100)
 
 ## load data
 path =  paste0(getwd(), "/Data/DiffExpression.tsv")
-Expr = read_tsv(path)
+Expr = read_tsv(path) %>% 
+  filter(power >= 0.8)
+Expr$contrast = factor(Expr$contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
 
 # make wide
-Expr_s = Expr %>% pivot_wider(id_cols = c(GeneSymbol, description), 
-                              names_from = Group, values_from = `LFC.ave`) 
+Expr_s = Expr %>% pivot_wider(id_cols = c(GeneSymbol), 
+                              names_from = contrast, values_from = logFC_ave) 
 ```
 
 #### prep matrix
@@ -45,9 +49,19 @@ targets = c("AR", "SRD5A2", "CYP19A1", "ESR1", "ESR2", "BDNF", "KDR", "FLT1", "F
 # target genes expr
 Expr_s_targets = Expr_s %>% filter(GeneSymbol %in% targets)
 
+## get description
+library(org.Hs.eg.db) # v3.17.0
+library(AnnotationDbi) # v 1.62.2
+tmp = AnnotationDbi::select(org.Hs.eg.db,
+             keys = Expr_s_targets$GeneSymbol,
+             columns=c("SYMBOL","GENENAME"),
+             keytype="SYMBOL")
+
+Expr_s_targets = Expr_s_targets %>% left_join(tmp, by = c("GeneSymbol" = "SYMBOL"))
+
 # prep matrix
-input_matrix = Expr_s_targets[, 3:8] %>% as.matrix()
-row.names(input_matrix) = paste0(Expr_s_targets$GeneSymbol, ": ", Expr_s_targets$description)
+input_matrix = Expr_s_targets[, 2:7] %>% as.matrix()
+row.names(input_matrix) = paste0(Expr_s_targets$GeneSymbol, ": ", Expr_s_targets$GENENAME)
 input_matrix[is.na(input_matrix)] = 0
 ```
 
@@ -101,7 +115,6 @@ RowSideColors_fun = jColors$color[match(input_anno, jColors$fun)]
 par( lwd = 0.5)
 heatmap.2(x = input_matrix, Rowv = T, Colv = F, dendrogram =  "row",
           col = col_pl,
-          
           RowSideColors = RowSideColors_fun,
           na.rm = TRUE,
           na.color = "grey90",
@@ -137,261 +150,64 @@ legend(x = 0.1, y = 0.9,
 
 
 ### Fig.3B
-
 ```{r}
 library(tidyverse) # v.2.0.0
+library(clusterProfiler) # v4.8.3
 
 ## load data
-path = paste0(getwd(), "/Data/ClueGO_Top10.csv")
-ClueGO_short = read_csv(file = path)
+path =  paste0(getwd(), "/Data/DiffExpression.tsv")
+Expr = read_tsv(path) %>% 
+  filter(power >= 0.8)
+Expr$contrast = factor(Expr$contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
 
-## prep data
-input = ClueGO_short %>% 
-  mutate(`GO term` = paste(GOID, GOTerm, sep = ": ")) %>% 
-  dplyr::select(`GO term`, fun.ind, fun, matches("Nr")) %>% 
-  pivot_longer(cols = matches("Nr"), names_to = "Group", values_to = "value") %>% 
-  mutate(Group = gsub("Nr..Genes_", "", Group))
-input$Group = factor(input$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+# GO
+reatomeL = lapply(unique(Expr$contrast), function(s){
+  tmplist = Expr %>% filter(contrast == s)
+  tmp <- enrichGO(gene = tmplist$GeneSymbol,
+                  keyType = 'SYMBOL',
+                  # universe = universe,
+                  OrgDb = org.Hs.eg.db,
+                  ont = "BP",
+                  pvalueCutoff = 0.05,
+                  pAdjustMethod = "BH",
+                  readable = TRUE) # GO
+  x = tmp@result %>% mutate(group = s)
+})
+reatometb = reatomeL %>% bind_rows()
 
-input = input %>% 
-  ## sort by time
-  arrange(Group, value )
-input$`GO term` = factor(input$`GO term`, levels = rev(unique(input$`GO term`)))
+reatometb_sel = reatometb %>% 
+  filter(`p.adjust` <= 0.05)
+reatometb_sel %>% group_by(group) %>% tally()
+reatometb_sel = reatometb_sel %>% 
+  group_by(group) %>% 
+  slice_min(`p.adjust`, n = 10, with_ties = T) %>% 
+  arrange(group)
 
-## legend
-colpal = c(brewer.pal(9, name = 'Set1')[c(1:2, 8, 3,4,7,5, 9)], brewer.pal(9, name = 'Set3')[-2])
-# plot(1:length(colpal), col = colpal, pch = 19)
-colpal = colpal[1:length(unique(input$fun))]
-colpal_alpha = alpha(colpal, 0.5)
+plot(reatometb_sel$p.adjust, reatometb_sel$qvalue)
+cor(reatometb_sel$p.adjust, reatometb_sel$qvalue) # 0.97
 
-if(length(colpal) == length(unique(input$fun))){
-  unique(input$fun)
-  lab = unique(input$fun)
-  lab = factor(lab, levels = lab);
-  lab; length(lab)
-  
-  n = ceiling(length(lab)/2)
-  plot(x = c(rep(0, n), rep(8, n)), y = c(n:1, n:1), col = alpha(colpal, 0.5), pch = 19, xlim = c(0, 15))
-  text(x = c(rep(.2, n), rep(8.2, n)), y = c(n:1, n:1), lab, cex= 1, pos=4, col="black")
+termls = reatometb_sel$ID
 
-}
+reatometb_sel2 = reatometb_sel %>% filter(ID %in% termls) %>% 
+  mutate(Description2 = paste0(ID, ": ", Description))
+reatometb_sel2$group <- factor(reatometb_sel2$group, levels = unique(Expr$contrast))
+reatometb_sel2 = arrange(reatometb_sel2, group, Description2)
+reatometb_sel2$Description2 <- factor(reatometb_sel2$Description2 ,
+                                    levels = rev(unique(reatometb_sel2$Description2 )))
 
-```
-
-#### plot
-
-```{r}
-## colors for T groups
 cbPalette = rev(brewer.pal(6, 'Spectral')) 
-# plot(1:6, col = cbPalette, cex = 5, pch = 19)
-
-jColors <- with(input, data.frame(fun = lab, color = I(colpal)))
-RowSideColors_fun = jColors$color[match(input$fun, jColors$fun)]
-input2 = cbind(input, RowSideColors_fun)
-
-ymax = 3050
-paper = ggplot(input2, aes(y = value, x = `GO term`)) +
-  geom_bar(aes( fill = Group), stat = 'identity', 
-           position= position_stack(reverse = TRUE), 
-           width = .8, alpha = 0.9, color = 'grey', size = 0.05) + 
-  geom_point(aes(x = `GO term`, y = ymax), 
-             color = RowSideColors_fun, alpha = 0.1, size = 0.8) +
+p = ggplot(reatometb_sel2, aes(y = Count, x = Description2)) +
+  geom_bar(aes( fill = group), stat = 'identity',
+           position= position_stack(reverse = TRUE),
+           width = .8, alpha = 0.9, color = 'grey', linewidth = 0.05) +
   coord_flip() +
   scale_fill_manual(values = cbPalette) +
   scale_y_continuous(name = "Number of observed genes", expand = c(0,0, 0.05, 0)) +
   guides(fill = guide_legend(nrow = 2, byrow = TRUE)) +
-  theme_classic() + 
-  theme(panel.grid.major.x = element_line(color = "grey90", size = .2),
+  theme_classic() + theme(panel.grid.major.x = element_line(color = "grey90", size = .2),
                   axis.title.y = element_blank(),
-                  legend.key.size = unit(8, 'pt'), 
-                  legend.position = "bottom") ; paper
-```
-
-### Fig.3C and Supplementary Table 9
-```{r}
-library(tidyverse) # v.2.0.0
-
-path =  paste0(getwd(), "/Data/DiffExpression.tsv")
-Expr = read_tsv(path)
-Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
-
-path = paste0(getwd(), "/Data/CellType_GeneList.tsv")
-cell_type_gene_lists_df = read_tsv(path)
-
-cell_typeS = c( 
-  # vessel
-  "Endothelial cell", "Fibroblast", "Pericyte", "Smooth muscle cell",
-  # Glia
-  "Glial", "Astrocyte", "Microglia", "Oligodendrocyte", 
-  # neuron
-  "Neuron", "Neuronal", "Interneuron", "Projection neuron", 
-  # neuronal process
-  "Axon", "Axon hillock", "Myelin", "Dendrite", "Spine" , "Gap junction", 
-  # neurotransmitters
-  "Adrenergic receptor", "Epinephrine", "Norepinephrine", 
-  "Dopamine receptor", "Dopamine", "GABA receptor", "GABA", 
-  "Glutamate receptor", "Glutamate", "Glycine receptor", "Glycine", 
-  "Histamine receptor", "Histamine", "Serotonin receptor", "Serotonin",
-  # Genesis
-  "Neural stem cell", "Radial glial cell")
-
-groups = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d")
-
-# color for Time points
-cbPalette = rev(brewer.pal(length(groups), 'Spectral'))
-# plot(1:length(cbPalette), col = cbPalette, pch = 19, cex = 3)
-
-## expectation standardize to expectation value [function] 
-Plot_gene_expectationRatio = function(temp_cell_type, interest_dir, padj, return_plot){
-  # temp_cell_type = cell_typeS[1]
-  # interest_dir = 'up'
-  # padj = 'fdr'
-  
-  print(temp_cell_type)
-  interest_dir_in_fun = interest_dir
-  print(interest_dir_in_fun)
-  if(interest_dir_in_fun == "up"){ dir_title = "up-regulated"}else 
-    if(interest_dir_in_fun == "dw"){ dir_title = "down-regulated"}else{ dir_title = "" }
-  
-  temp_cell_type_list = cell_type_gene_lists_df %>% filter(CellType == temp_cell_type)
-  
-  temp_intersectS = 
-    sapply(X = 1:length(groups), interest_dir2 = interest_dir_in_fun, 
-           FUN = function(j, interest_dir2){
-             print(paste0("j = ", j))
-             
-             temp_up = Expr %>% filter(Group == groups[j], LFC.ave > 0) %>% pull(GeneSymbol)
-             temp_dw = Expr %>% filter(Group == groups[j], LFC.ave < 0) %>% pull(GeneSymbol )
-             
-             if(interest_dir2 == "up"){ temp_updw = temp_up}else 
-               if(interest_dir2 == "dw"){ temp_updw = temp_dw}else{
-                 temp_updw = c(temp_up, temp_dw) }
-             # print(paste0("length:", length(temp_updw)))
-             
-             temp = intersect(temp_updw, temp_cell_type_list$GeneSymbol) ;
-             count = length(temp);
-             len_timepoint = length(unique(temp_updw)) ;
-             len_cell_list = length(unique(temp_cell_type_list$GeneSymbol)) ;
-             len_universe = 12018 # gene expressed in HVC
-             # canary genome: https://www.ncbi.nlm.nih.gov/genome/annotation_euk/Serinus_canaria/101/#FeatureCountsStats;
-             expect = len_timepoint*len_cell_list/len_universe ;
-             
-             mat <- matrix(
-               c(count,                       # gene in list & in the interested category
-                 len_timepoint - count,       # gene in list but in the interested category
-                 len_cell_list,               # gene in universe & in the interested category
-                 len_universe - len_cell_list # gene in universe but not in the interested category
-               ),  
-               nrow = 2);
-             fr <- fisher.test(mat, alternative = "greater")
-             # print(expect)
-             return(c(count, expect, signif(fr$p.value, 10) )) 
-             })
-  
-  temp_intersectS = as.data.frame(t(temp_intersectS));
-  names(temp_intersectS) = c("Gene count", "Expectation", "P-value");
-  temp_intersectS$`Time point` = groups;
-  temp_intersectS$`Search term` = temp_cell_type;
-  temp_intersectS$Substraction = temp_intersectS$`Gene count`- temp_intersectS$Expectation;
-  temp_intersectS$Ratio = temp_intersectS$Substraction/temp_intersectS$Expectation*100
-  temp_intersectS$FDR = p.adjust(temp_intersectS$`P-value`, method = padj) # bonferroni, fdr
-  temp_intersectS$Significance = ifelse(temp_intersectS$FDR < 0.05, '*', NA) # bonferroni, fdr
-  temp_intersectS = within(temp_intersectS, `Time point` <- factor(`Time point`, levels = groups))
-  temp_intersectS = cbind(temp_intersectS, "Direction" = interest_dir_in_fun)
-  
-  if(return_plot == TRUE){
-    ggplot(temp_intersectS, aes(x = `Time point`, y = Ratio, fill = `Time point`)) +
-      geom_col() +
-      geom_hline(yintercept = 0, color = "darkgrey", size = 0.25) +
-      geom_text(data = subset(temp_intersectS, su = FDR < 0.05), label = "*") +
-      scale_fill_manual(values = cbPalette) +
-      scale_y_continuous(name = "Enrichment\nscore") +
-      ggtitle(paste(temp_cell_type, dir_title, sep = "\n")) +
-      theme_m + 
-      theme(plot.title = element_text(hjust = 0.5),
-            axis.text.x = element_blank(),
-            axis.ticks.x = element_blank()
-            ) ;
-  }else{temp_intersectS}
-}
-
-```
-
-#### Supplementary Table 9
-```{r}
-interest_dir_in = c("up", "dw")
-multiple_correction_method = "fdr"
-
-plot_out = mapply(rep(cell_typeS, each = length(interest_dir_in)), 
-                  interest_dir = rep(interest_dir_in, length(cell_typeS)),
-                  padj = multiple_correction_method, 
-                  return_plot = FALSE,
-                  FUN = Plot_gene_expectationRatio, SIMPLIFY = FALSE)
-plot_out_r = plot_out %>% bind_rows()
-
-# reorganize table
-plot_out_r2 = plot_out_r %>% 
-  select(`Search term`, Direction, `Time point`, `Gene count`, Expectation, `P-value`, FDR, Significance) %>%
-  mutate(Direction = gsub("up", "up-regulated", Direction),
-         Direction = gsub("dw", "down-regulated", Direction))
-```
-
-#### plot Fig.3C
-```{r}
-
-### up and down separate ##
-rbind_df = plot_out_r2 %>% filter( Direction %in% c("up-regulated", "down-regulated")) %>% 
-  mutate(`adjusted p value` = ifelse(FDR > 0.05, NA, FDR))
-
-#### Cell type panel
-rbind_df_1 = rbind_df %>% 
-  filter(`Search term` %in% c("Endothelial cell", "Smooth muscle cell",
-                              "Astrocyte", "Microglia", "Oligodendrocyte",
-                              "Interneuron", "Projection neuron"))
-#### Neuron location + neurotransmitter panel
-rbind_df_2 = rbind_df %>% 
-  filter(`Search term` %in% c("Axon", "Myelin", "Dendrite", "Spine" , "Gap junction", 
-                              "GABA", "Glutamate"))
-#### combine both
-rbind_df = rbind(cbind("Source" = "Cell type", rbind_df_1),
-                 cbind("Source" = "Neuronal", rbind_df_2))
-
-rbind_df$`Time point` = factor(rbind_df$`Time point`, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
-rbind_df$Direction = factor(rbind_df$Direction, levels = c("up-regulated", "down-regulated"))
-rbind_df$`Search term` = factor(rbind_df$`Search term`, levels = rev(cell_typeS))
-
-sig_col = 'darkorange'
-
-NeuronLoc_p = ggplot(rbind_df, aes(x = `Time point`, y = `Search term`, fill = `adjusted p value`)) +
-  geom_tile(color = "grey90", size = 0.01) +
-  scale_fill_continuous(high = "white", low = sig_col, na.value = alpha("grey90", 0.5)) + 
-  scale_y_discrete(expand = c(0,0)) +
-  scale_x_discrete(expand = c(0,0)) + 
-  facet_grid( Source ~ Direction, scales = "free_y", space = "free_y") +
-  theme_classic() + 
-  theme(axis.title.x = element_blank(),
-        axis.title.y = element_blank()); NeuronLoc_p
-
-```
-
-### Supplementary Table 10
-```{r}
-library(tidyverse) # v.2.0.0
-
-path =  paste0(getwd(), "/Data/DiffExpression.tsv")
-Expr = read_tsv(path)
-Expr$Group = factor(Expr$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
-
-path = paste0(getwd(), "/Data/CellType_GeneList.tsv")
-cell_type_gene_lists_df = read_tsv(path)
-
-Expr_sel = Expr %>% dplyr::select(GeneSymbol, Group, LFC.ave, regulatory.function, matrix.family, Chromosome)
-
-cell_type_gene_express = cell_type_gene_lists_df %>% 
-  left_join(Expr_sel) %>% 
-  filter(!is.na(LFC.ave)) %>% 
-  pivot_wider(names_from = Group, values_from = LFC.ave) %>% 
-  dplyr::select(CellType:Chromosome, T1h, T3h, T8h, T3d, T7d, T14d)
+                  legend.key.size = unit(8, 'pt'),
+                  legend.position = "bottom") ; p
 
 ```
 
@@ -399,11 +215,14 @@ cell_type_gene_express = cell_type_gene_lists_df %>%
 ```{r}
 library(tidyverse) # v.2.0.0
 
-path = paste0(getwd(), "/Data/WGCNA/Expression_est_perBird.tsv")
+# exp 
+path = paste0(getwd(), "/Data/Expression_est_perBird.tsv")
 datExprori = read_tsv(path)
 
-interested_genes = c("AR", "HSD17B12", "SRD5A2", "ESR1", "ESR2", "SP8")
-ind = sapply(interested_genes, function(s){which(names(datExprori) == s)})
+interested_genes = c("AR", "SRD5A2", "ESR1", "ESR2")
+ind = sapply(interested_genes, function(s){
+  which(names(datExprori) == s)
+})
 ind = unlist(ind)
 
 datExpr_sel = datExprori %>% dplyr::select(sample, all_of(ind)) %>% 
@@ -418,6 +237,7 @@ datExpr_sel = datExprori %>% dplyr::select(sample, all_of(ind)) %>%
          n = n(),
          sd = sd(`Normalized expression`, na.rm = TRUE),
          sem = sd/sqrt(n))
+# datExpr_sel$g
 
 w = 0.25
 grey_point_size = 0.5
@@ -428,6 +248,7 @@ dodge = position_jitter(width = 0.05, height = 0)
 
 errorbar_col = "darkorange"
 
+# sd [using]
 p = datExpr_sel %>% 
   ggplot(aes(x = group, y = `Normalized expression`)) +
   geom_point(alpha = 0.7, size = grey_point_size,
@@ -444,42 +265,108 @@ p = datExpr_sel %>%
 
 
 ### Fig. 3 - Figure supplement 2A
-```{r, fig.height=8, fig.width=6}
+```{r}
 library(tidyverse) # v.2.0.0
+library(clusterProfiler) # v4.8.3
 
 ## load data
-path = paste0(getwd(), "/Data/ClueGO_full_results_KEGG.csv")
-ClueGO_short = read_csv(file = path)
+path =  paste0(getwd(), "/Data/DiffExpression.tsv")
+Expr = read_tsv(path) %>% 
+  filter(power >= 0.8)
+Expr$contrast = factor(Expr$contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
 
-## prep data
-input = ClueGO_short %>% 
-  mutate(`GO term` = paste(GOID, GOTerm, sep = ": ")) %>% 
-  dplyr::select(`GO term`, matches("Nr")) %>% 
-  pivot_longer(cols = matches("Nr"), names_to = "Group", values_to = "value") %>% 
-  mutate(Group = gsub("Nr..Genes_", "", Group)) 
-input$Group = factor(input$Group, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+## KEGG 
+keggL = lapply(unique(Expr$contrast), function(s){
+  # s = "T1h"
+  tmplist = Expr %>% filter(contrast == s)
+  ent = mapIds(org.Hs.eg.db, tmplist$GeneSymbol, 'ENTREZID', 'SYMBOL') # to from
+  ent2 = na.omit(unique(unlist(ent)))
+  tmp <- enrichKEGG(gene = ent2,
+                    # universe = universe_cel_ent2,
+                    organism = "hsa",
+                    keyType = 'ncbi-geneid',
+                    pvalueCutoff = 0.05,
+                    pAdjustMethod = "BH")
+  x = tmp@result %>% mutate(group = s)
+})
+keggtb = keggL %>% bind_rows()
 
-input = input %>% 
-  ## sort by time
-  arrange(Group, value )
-input$`GO term` = factor(input$`GO term`, levels = rev(unique(input$`GO term`)))
+keggtb_sel = keggtb %>% 
+  filter(`p.adjust` <= 0.05) 
+keggtb_sel %>% group_by(group) %>% tally()
+keggtb_sel = keggtb_sel %>%
+  group_by(group) %>%
+  slice_min(`p.adjust`, n = 10, with_ties = T)
 
-## colors for T groups
-cbPalette = rev(brewer.pal(6, 'Spectral')) 
+# take all pathways (if it's significant in other groups but not top10)
+termls = keggtb_sel$ID
 
-ymax = ceiling(max(input$value, na.rm = TRUE)*1.1)
-paper = ggplot(input, aes(y = value, x = `GO term`)) +
-  geom_bar(aes( fill = Group), stat = 'identity', 
-           position= position_stack(reverse = TRUE), 
-           width = .8, alpha = 0.9, color = 'grey', size = 0.05) + 
+keggtb_sel2 = keggtb_sel %>% filter(ID %in% termls)
+keggtb_sel2$group <- factor(keggtb_sel2$group, levels = unique(Expr$contrast))
+keggtb_sel2 = arrange(keggtb_sel2, group, Description)
+keggtb_sel2$Description <- factor(keggtb_sel2$Description ,
+                                     levels = rev(unique(keggtb_sel2$Description )))
+
+cbPalette = rev(brewer.pal(6, 'Spectral')) # this is still better
+
+paperkegg = ggplot(keggtb_sel2, aes(y = Count, x = Description)) +
+  geom_bar(aes( fill = group), stat = 'identity',
+           position= position_stack(reverse = TRUE),
+           width = .8, alpha = 0.9, color = 'grey', linewidth = 0.05) +
   coord_flip() +
-  scale_fill_manual(values = cbPalette, drop=FALSE) +
+  scale_fill_manual(values = cbPalette, drop = FALSE) +
   scale_y_continuous(name = "Number of observed genes", expand = c(0,0, 0.05, 0)) +
   guides(fill = guide_legend(nrow = 2, byrow = TRUE)) +
-  theme_classic() + 
-  theme(panel.grid.major.x = element_line(color = "grey90", size = .2),
+  theme_classic() + theme(panel.grid.major.x = element_line(color = "grey90", size = .2),
                   axis.title.y = element_blank(),
-                  legend.key.size = unit(8, 'pt'), 
-                  legend.position = "bottom") ; paper
+                  legend.key.size = unit(8, 'pt'),
+                  legend.position = "bottom") ; paperkegg
+```
+
+### Fig. 3 - Figure supplement 2B
+```{r}
+library(tidyverse) # v.2.0.0
+library(clusterProfiler) # v4.8.3
+
+## load data
+path =  paste0(getwd(), "/Data/DiffExpression.tsv")
+Expr = read_tsv(path) %>% 
+  filter(power >= 0.8)
+Expr$contrast = factor(Expr$contrast, levels = c("T1h", "T3h", "T8h", "T3d", "T7d", "T14d"))
+
+tmp_T14d = Expr %>% filter(contrast == 'T14d')
+tmp_notT14d = Expr %>% filter(contrast != 'T14d')
+tmp_T14d_only = tmp_T14d %>% filter(!GeneSymbol %in% tmp_notT14d$GeneSymbol)
+n_distinct(tmp_T14d_only$GeneSymbol) # 3769
+
+tmp_u <- enrichGO(gene = tmp_T14d_only$GeneSymbol,
+                  keyType = 'SYMBOL',
+                  # universe = universe_cel,
+                  OrgDb = org.Hs.eg.db,
+                  ont = "BP",
+                  pvalueCutoff = 0.05,
+                  pAdjustMethod = "BH",
+                  readable = TRUE) # GO - BP
+T14d_only_go_u = tmp_u@result
+T14d_only_go_u_sig = T14d_only_go_u %>% filter(`p.adjust` <= 0.05) 
+barplot(tmp_u, showCategory = 10)
+
+theme_m2 = theme(
+  plot.background = element_blank(), 
+  plot.title =  element_blank(), 
+  panel.background = element_blank(),
+  panel.border =  element_blank(), 
+  panel.grid = element_blank(), 
+  panel.spacing.x = unit(0.2, "lines"),
+  panel.spacing.y = unit(0.2, "lines"),
+  axis.line = element_line(color = "black", size = .1),
+  axis.title.y = element_blank(), 
+  axis.ticks = element_line(colour = "black", size = 0.02),
+  legend.background = element_blank(),
+  legend.key = element_blank(),
+  legend.key.size = unit(8, 'pt')
+  )
+
+papergo_t14donly = barplot(tmp_u, showCategory = 15) + theme_m2; papergo_t14donly
 ```
 
