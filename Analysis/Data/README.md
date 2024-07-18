@@ -163,5 +163,5 @@ This repository contains the following files that are critical for reproducing t
 * Format(s): .tsv
 * Variables:
   * Sample: Sample (Bird) ID
-  * Column 2 to 12361: Average expression of each gene (each column corresponds to a specific gene)
+  * Column 2 to 12360: Average expression of each gene (each column corresponds to a specific gene)
 
