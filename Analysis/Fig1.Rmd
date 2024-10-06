@@ -842,7 +842,7 @@ Daily_SongRate_p = ggplot(data = db, aes(x = as.numeric(n_Day), y = Daily_SongRa
                                     color = as.factor(Ind))) +
   # raw data
   geom_point(position = dodge, alpha = 0.5, size = grey_point_size) +
-  scale_x_continuous(breaks = seq(0, 14, by = 2), limits = c(NA, 14)) +
+  scale_x_continuous(breaks = seq(0, 14, by = 2), limits = c(NA, 14.2)) +
   facet_wrap(.~Ind, drop = FALSE, nrow = 2 ) +
   xlab('Day after testosterone implantation') +
   ylab(y_lab) +
@@ -879,7 +879,7 @@ SongLen_p = ggplot(db) +
                  color = as.factor(Ind)),
              position = dodge, alpha = 0.5, size = grey_point_size) +
   # scale_colour_manual(values = col_palette) +
-  scale_x_continuous(breaks = seq(0, 14, by = 2), limits = c(NA, 14)) +
+  scale_x_continuous(breaks = seq(0, 14, by = 2), limits = c(NA, 14.2)) +
   facet_wrap(.~Ind, drop = FALSE, nrow = 2 ) +
   xlab('Day after testosterone implantation') +
   ylab(y_lab) +
@@ -914,7 +914,7 @@ RepetitionRate_p = ggplot(db, aes(x = as.numeric(n_Day), y = RepetitionRate,
   # raw data
   geom_point(position = dodge, alpha = 0.5, size = grey_point_size) +
   # scale_colour_manual(values = col_palette) +
-  scale_x_continuous(breaks = seq(0, 14, by = 2), limits = c(NA, 14)) +
+  scale_x_continuous(breaks = seq(0, 14, by = 2), limits = c(NA, 14.2)) +
   facet_wrap(.~Ind, drop = FALSE, nrow = 2 ) +
   xlab('Day after testosterone implantation') +
   ylab(y_lab) +
@@ -950,7 +950,7 @@ SylperSong_p = ggplot(db, aes(x = as.numeric(n_Day), y = SylperSong,
   # raw data
   geom_point(position = dodge, alpha = 0.5, size = grey_point_size) +
   # scale_colour_manual(values = col_palette) +
-  scale_x_continuous(breaks = seq(0, 14, by = 2), limits = c(NA, 14)) +
+  scale_x_continuous(breaks = seq(0, 14, by = 2), limits = c(NA, 14.2)) +
   facet_wrap(.~Ind, drop = FALSE, nrow = 2 ) +
   xlab('Day after testosterone implantation') +
   ylab(y_lab) +
